@@ -86,28 +86,40 @@ struct gamestatus
     //FOR THE TRICK
     int wholeads;
     vector<card> trick;
+    void resettrick()
+    {
+        
+    }
+    void resethand()
+    {
+        
+    }
+    void resetgame()
+    {
+        
+    }
 };
 
 class player
 {
 public:
-    virtual void playcard() = 0;
-    virtual bool bet(gamestatus gamestatus) = 0;
-    virtual void forcebet(gamestatus gamestatus) = 0;
+    virtual void playcard(gamestatus &gamestatus) = 0;
+    virtual bool bet(gamestatus &gamestatus) = 0;
+    virtual void forcebet(gamestatus &gamestatus) = 0;
     vector<card> hand;
 };
 
 class trainer : public player
 {
-    virtual void playcard()
+    virtual void playcard(gamestatus &gamestatus)
     {
         cout << "";
     }
-    bool bet(gamestatus gamestatus)
+    bool bet(gamestatus &gamestatus)
     {
         return -1;
     }
-    void forcebet(gamestatus gamestatus)
+    void forcebet(gamestatus &gamestatus)
     {
         
     }
@@ -115,15 +127,15 @@ class trainer : public player
 
 class learner : public player
 {
-    virtual void playcard()
+    virtual void playcard(gamestatus &gamestatus)
     {
         cout << "";
     }
-    bool bet(gamestatus gamestatus)
+    bool bet(gamestatus &gamestatus)
     {
         return -1;
     }
-    void forcebet(gamestatus gamestatus)
+    void forcebet(gamestatus &gamestatus)
     {
         
     }
@@ -131,13 +143,16 @@ class learner : public player
 
 class human : public player
 {
-    virtual void playcard()
+    virtual void playcard(gamestatus &gamestatus)
     {
         cout << "";
     }
     bool bet(gamestatus gamestatus)
     {
-        return -1;
+        cout << "How much do you want to bet?" << endl;
+        int x;
+        cin >> x;
+        return true;
     }
     void forcebet(gamestatus gamestatus)
     {
@@ -161,11 +176,14 @@ int main(int argc, const char * argv[])
         makebets(players, gamestatus);
         for(int round = 0; round < 6; ++round)
         {
-            //dealer/person who won the last trick starts out
-            
+            for(int currplayer = gamestatus.wholeads, i = 0; i < 4; ++i, currplayer = (currplayer + 1)%gamestatus.numplayers) players[currplayer]->playcard(gamestatus);
+            gamestatus.resettrick();
         }
+        gamestatus.resethand();
     }
-    
+    if(gamestatus.team1score < 11) cout << "You Lose: Team 2 Wins" << endl;
+    else cout << "You win!! Congrats" << endl;
+    return 0;
 }
 
 void setup(vector<player*> &players, deck &carddeck, gamestatus &gamestatus)
@@ -186,7 +204,7 @@ void dealcards(vector<player*> &players, const deck &carddeck)
 }
 
 void makebets(const vector<player*> &players, gamestatus &gamestatus)
-{
+{//FIX THIS
     int currentbetter = (gamestatus.whodealt+2) % gamestatus.numplayers;
     gamestatus.whodealt = (gamestatus.whodealt+1) % gamestatus.numplayers;
     for(int dealer = currentbetter - 1; currentbetter != dealer && !players[currentbetter]->bet(gamestatus); currentbetter = (currentbetter + 1) % gamestatus.numplayers);
