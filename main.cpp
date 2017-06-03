@@ -84,8 +84,8 @@ struct gamestatus
     string trumpsuit;
     vector<card> team1cards, team2cards;
     //FOR THE TRICK
-    int wholeads;
     vector<card> trick;
+    //FOR RESETTING
     void resettrick()
     {
         
@@ -104,8 +104,8 @@ class player
 {
 public:
     virtual void playcard(gamestatus &gamestatus) = 0;
-    virtual bool bet(gamestatus &gamestatus) = 0;
-    virtual void forcebet(gamestatus &gamestatus) = 0;
+    virtual bool bet(gamestatus &gamestatus, const int &index) = 0;
+    virtual void forcebet(gamestatus &gamestatus, const int &index) = 0;
     vector<card> hand;
 };
 
@@ -113,15 +113,19 @@ class trainer : public player
 {
     virtual void playcard(gamestatus &gamestatus)
     {
-        cout << "";
+        gamestatus.trick.push_back(hand.back());
+        hand.pop_back();
     }
-    bool bet(gamestatus &gamestatus)
+    bool bet(gamestatus &gamestatus, const int &index)
     {
-        return -1;
+        gamestatus.bet = 2;
+        gamestatus.whobet = index;
+        return true;
     }
-    void forcebet(gamestatus &gamestatus)
+    void forcebet(gamestatus &gamestatus, const int &index)
     {
-        
+        gamestatus.bet = 2;
+        gamestatus.whobet = index;
     }
 };
 
@@ -129,15 +133,19 @@ class learner : public player
 {
     virtual void playcard(gamestatus &gamestatus)
     {
-        cout << "";
+        gamestatus.trick.push_back(hand.back());
+        hand.pop_back();
     }
-    bool bet(gamestatus &gamestatus)
+    bool bet(gamestatus &gamestatus, const int &index)
     {
-        return -1;
+        gamestatus.bet = 2;
+        gamestatus.whobet = index;
+        return true;
     }
-    void forcebet(gamestatus &gamestatus)
+    void forcebet(gamestatus &gamestatus, const int &index)
     {
-        
+        gamestatus.bet = 2;
+        gamestatus.whobet = index;
     }
 };
 
@@ -147,16 +155,17 @@ class human : public player
     {
         cout << "";
     }
-    bool bet(gamestatus gamestatus)
+    bool bet(gamestatus gamestatus, const int &index)
     {
         cout << "How much do you want to bet?" << endl;
         int x;
         cin >> x;
         return true;
     }
-    void forcebet(gamestatus gamestatus)
+    void forcebet(gamestatus gamestatus, const int &index)
     {
-        
+        gamestatus.bet = 2;
+        gamestatus.whobet = index;
     }
 };
 
@@ -176,7 +185,7 @@ int main(int argc, const char * argv[])
         makebets(players, gamestatus);
         for(int round = 0; round < 6; ++round)
         {
-            for(int currplayer = gamestatus.wholeads, i = 0; i < 4; ++i, currplayer = (currplayer + 1)%gamestatus.numplayers) players[currplayer]->playcard(gamestatus);
+            for(int currplayer = gamestatus.whobet, i = 0; i < 4; ++i, currplayer = (currplayer + 1)%gamestatus.numplayers) players[currplayer]->playcard(gamestatus);
             gamestatus.resettrick();
         }
         gamestatus.resethand();
@@ -207,6 +216,6 @@ void makebets(const vector<player*> &players, gamestatus &gamestatus)
 {//FIX THIS
     int currentbetter = (gamestatus.whodealt+2) % gamestatus.numplayers;
     gamestatus.whodealt = (gamestatus.whodealt+1) % gamestatus.numplayers;
-    for(int dealer = currentbetter - 1; currentbetter != dealer && !players[currentbetter]->bet(gamestatus); currentbetter = (currentbetter + 1) % gamestatus.numplayers);
-    if(currentbetter == gamestatus.whodealt) players[currentbetter]->forcebet(gamestatus);
+    for(int dealer = currentbetter - 1; currentbetter != dealer && !players[currentbetter]->bet(gamestatus, currentbetter); currentbetter = (currentbetter + 1) % gamestatus.numplayers);
+    if(currentbetter == gamestatus.whodealt) players[currentbetter]->forcebet(gamestatus, currentbetter);
 }
