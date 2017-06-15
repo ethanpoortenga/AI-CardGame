@@ -217,7 +217,8 @@ class trainer : public player
         {
             if(hand[i].getsuit() == cardtoplay.getsuit() && hand[i].getvalue() == cardtoplay.getvalue())
             {
-                hand.erase(hand.begin() + i);
+                if(i!=hand.size() - 1) swap(*(hand.begin()+i),hand.back());
+                hand.pop_back();
                 break;
             }
         }
@@ -518,7 +519,8 @@ class human : public player
         hand[index].whoplayed = whichteam;
         if(first) gamecontroller.ledsuit = hand[index].getsuit();
         gamecontroller.trick.push_back(hand[index]);
-        hand.erase(hand.begin() + index);
+        if(index!=hand.size() - 1) swap(*(hand.begin() + index),hand.back());
+        hand.pop_back();
     }
     bool bet(gamecontroller &gamecontroller, const int &index)
     {
@@ -595,20 +597,29 @@ void makebets(const vector<player*> &players, gamecontroller &gamecontroller)
     int currentbetter = gamecontroller.whodealt;
     for(int i = 1; i < 4; ++i)
     {
-        players[currentbetter]->bet(gamecontroller, currentbetter);
-        currentbetter = (currentbetter + i) % 4;
+        players[currentbetter]->bet(gamecontroller, currentbetter%2);
+        currentbetter = (currentbetter + 1) % 4;
     }
     if(gamecontroller.bet == 0) players[currentbetter]->forcebet(gamecontroller,currentbetter);
     else players[currentbetter]->bet(gamecontroller,currentbetter);
     cout << endl;
+    cout << flush;;
 }
 
 void playtrick(const vector<player*> &players, gamecontroller &gamecontroller)
 {
     int currplayer = gamecontroller.wholeads;
     players[currplayer]->playcard(gamecontroller,true);
+    cout << endl;
     players[(currplayer+1)%4]->playcard(gamecontroller,false);
+    cout << endl;
     players[(currplayer+2)%4]->playcard(gamecontroller,false);
+    cout << endl;
     players[(currplayer+3)%4]->playcard(gamecontroller,false);
+    cout << endl;
     gamecontroller.resettrick();
+    cout << "continue?" << endl;
+    cin >> currplayer;
+    cout << endl << endl;
+    cout << flush;
 }
