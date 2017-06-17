@@ -82,8 +82,15 @@ struct gamecontroller
     //FOR RESETTING
     void resettrick()
     {
-        if(findtrickwinner()) for(auto card:trick) card.whotookin = 1;
-        else for(auto card:trick) card.whotookin = 1;
+        int whowon = findtrickwinner();
+        if(whowon%2 == 0)
+        {
+            for(auto card:trick) card.whotookin = wholeads;
+        }
+        else
+        {
+            for(auto card:trick) card.whotookin = (wholeads+1)%2;
+        }
         for(auto card:trick) cardsplayed.push_back(card);
         for(auto card:trick)
         {
@@ -91,7 +98,8 @@ struct gamecontroller
             else if(card.getvalue() == 10) points[card.whotookin] += 10;
             if(card.getsuit() == trumpsuit && card.getvalue() >10) jackqueenkingace[card.getvalue()-11]=true;
         }
-        cout << "team " << trick[0].whotookin << " won the trick" << endl;
+        cout << "player " << whowon << " won the trick" << endl;
+        wholeads = whowon;
         trick.clear();
     }
     void resethand()
@@ -105,7 +113,7 @@ struct gamecontroller
         else if(findjack() == 2) ++team2pointswon;
         if(findgame() == 0) ++team1pointswon;
         else if(findgame() == 1) ++team2pointswon;
-        if(whobet%4 == 0)
+        if(whobet%2 == 0)
         {
             if(team1pointswon >= bet)
             {
@@ -133,24 +141,24 @@ struct gamecontroller
         team1score = 0;
         team2score = 0;
     }
-    int findtrickwinner() //return true if team1won
+    int findtrickwinner() //return true if the team who led won
     {
         card currenthighest(0,0);
         for(int i = 0; i < 4; ++i) if(trick[i].getsuit() == trumpsuit && trick[i].getvalue() > currenthighest.getvalue())currenthighest = trick[i];
         if(currenthighest.getvalue() == 0) for(int i = 0; i < 4; ++i) if(trick[i].getsuit() == ledsuit && trick[i].getvalue() > currenthighest.getvalue())currenthighest = trick[i]; //notrump
-        return (currenthighest.whoplayed == 1);
+        return currenthighest.whoplayed;
     }
     bool findhighestcard() //return true if it's in team1
     {
         card currenthighest(0,0);
         for(auto card : cardsplayed) if(card.getsuit() == trumpsuit && card.getvalue() > currenthighest.getvalue()) currenthighest = card;
-        return (currenthighest.whoplayed == 1);
+        return (currenthighest.whoplayed%2 == 1);
     }
     bool findlowestcard() //return true if it's in team1
     {
         card currentlowest(0,15);
         for(auto card : cardsplayed) if(card.getsuit() == trumpsuit && card.getvalue() < currentlowest.getvalue()) currentlowest = card;
-        return (currentlowest.whoplayed == 1);
+        return (currentlowest.whoplayed%2 == 1);
     }
     int findjack() //return 0 = team1, 1 = team2, -1 = no jack
     {
@@ -173,7 +181,7 @@ public:
     virtual void forcebet(gamecontroller &gamecontroller, const int &index) = 0;
     virtual void printhand() = 0;
     vector<card> hand;
-    int whichteam = 0;
+    int whichplayer = 0;
 };
 
 class trainer : public player
@@ -182,7 +190,7 @@ class trainer : public player
     void playcard(gamecontroller &gamecontroller, bool first)
     {
         printhand();
-        cout << whichteam << " trainer" << endl;
+        cout << whichplayer << " trainer" << endl;
         card cardtoplay(0,0);
         pair<bool,card> result(false,card(0,0));
         result = proirity1(gamecontroller);
@@ -211,7 +219,7 @@ class trainer : public player
     {
         card cardtoplay(0,0);
         cardtoplay = result.second;
-        cardtoplay.whoplayed = whichteam;
+        cardtoplay.whoplayed = whichplayer;
         gamecontroller.trick.push_back(cardtoplay);
         for(int i = 0; i < hand.size(); ++i)
         {
@@ -226,7 +234,7 @@ class trainer : public player
     bool bet(gamecontroller &gamecontroller, const int &index)
     {
         printhand();
-        cout << whichteam << endl;
+        cout << whichplayer << endl;
         int bet = 0;
         cout << "bet? put -1 for no" << endl;
         cin >> bet;
@@ -273,6 +281,7 @@ class trainer : public player
         //check whether the jack is out in the trick
         bool jackisout = false;
         int teamplayedjack = -1;
+        //DONT DO THIS IF YOU ALREADY HAVE THE JACK
         for(auto card:gamecontroller.trick)
         {
             if (card.getsuit() == gamecontroller.trumpsuit && card.getvalue() == 11)
@@ -288,7 +297,7 @@ class trainer : public player
         {
             //check whether my team is already taking it
             if(havejack) return pair<bool,card>(true,cardtotakeinjack);
-            else if(jackisout && teamplayedjack == whichteam) return playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+            else if(jackisout && teamplayedjack == whichplayer%2) return playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
             else if(jackisout) return pair<bool,card>(true,cardtotakeinjack);
         }
         return pair<bool,card>(false,card(0,0));
@@ -312,10 +321,7 @@ class trainer : public player
             bool otherwouldtakeintrumpsuit = false;
             if(tenledsuit)
             {
-                for(auto card:gamecontroller.trick)
-                {
-                    if(card.getvalue() > 10 && card.getsuit() == gamecontroller.ledsuit && card.whoplayed == (whichteam + 1) % 2) otherwouldtakeinledsuit = true;
-                }
+                for(auto card:gamecontroller.trick) if(card.getvalue() > 10 && card.getsuit() == gamecontroller.ledsuit && card.whoplayed == (whichplayer + 1) % 2) otherwouldtakeinledsuit = true;
             }
             for(auto card : gamecontroller.trick) if(card.getvalue() > 10 && card.getsuit() == gamecontroller.trumpsuit) otherwouldtakeintrumpsuit = true;
             if(!otherwouldtakeinledsuit && !otherwouldtakeintrumpsuit)
@@ -339,7 +345,7 @@ class trainer : public player
             else if(card.getvalue() == 10) gameintrick += 10;
         }
         //yes substantial game (Greater than 7 or will win game point)
-        if(gameintrick > 7 || (40 - gamecontroller.points[whichteam]) <= gameintrick)
+        if(gameintrick > 7 || (40 - gamecontroller.points[whichplayer%2]) <= gameintrick)
         {
             //work on taking in the game
             //check to see whether partner is already winning
@@ -352,7 +358,7 @@ class trainer : public player
                     if (card.getsuit() == gamecontroller.trumpsuit)
                     {
                         currenthighest = card;
-                        if(card.whoplayed == whichteam) myteamwinning = true;
+                        if(card.whoplayed%2 == whichplayer%2) myteamwinning = true;
                         else myteamwinning = false;
                     }
                     else if (card.getsuit() == gamecontroller.ledsuit)
@@ -360,16 +366,26 @@ class trainer : public player
                         if(currenthighest.getsuit() != gamecontroller.trumpsuit)
                         {
                             currenthighest = card;
-                            if(card.whoplayed == whichteam) myteamwinning = true;
+                            if(card.whoplayed%2 == whichplayer%2) myteamwinning = true;
                             else myteamwinning = false;
                         }
                     }
                 }
             }
             //my team winning
-            if(myteamwinning) playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+            if(myteamwinning)
+            {
+                if(gamecontroller.ledsuit != gamecontroller.trumpsuit) return playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+                return playworstcard(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+            }
             //other team winning
             {
+                if(gamecontroller.nummovestaken != 3)
+                {
+                    card cardtoplay = highestcardsamesuit(gamecontroller, currenthighest);
+                    if(cardtoplay.getsuit() != 0) return pair<bool,card>(true,cardtoplay);
+                    else return playworstcard(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+                }
                 //find the lowest card I have that can beat them
                 card lowestcardthatcanbeat = findlowestcardthatcanbeat(gamecontroller, currenthighest);
                 //if the current highest is trumpsuit
@@ -392,7 +408,7 @@ class trainer : public player
                 if (card.getsuit() == gamecontroller.trumpsuit)
                 {
                     currenthighest = card;
-                    if(card.whoplayed == whichteam) myteamwinning = true;
+                    if(card.whoplayed%2 == whichplayer%2) myteamwinning = true;
                     else myteamwinning = false;
                 }
                 else if (card.getsuit() == gamecontroller.ledsuit)
@@ -400,16 +416,26 @@ class trainer : public player
                     if(currenthighest.getsuit() != gamecontroller.trumpsuit)
                     {
                         currenthighest = card;
-                        if(card.whoplayed == whichteam) myteamwinning = true;
+                        if(card.whoplayed%2 == whichplayer%2) myteamwinning = true;
                         else myteamwinning = false;
                     }
                 }
             }
         }
-        if(myteamwinning) return playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+        if(myteamwinning)
+        {
+            if(gamecontroller.ledsuit != gamecontroller.trumpsuit) return playmostgame(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+            return playworstcard(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+        }
         //see whether I can win
         else
         {
+            if(gamecontroller.nummovestaken != 3)
+            {
+                card cardtoplay = highestcardsamesuit(gamecontroller, currenthighest);
+                if(cardtoplay.getsuit() != 0) return pair<bool,card>(true,cardtoplay);
+                else return playworstcard(gamecontroller.ledsuit, gamecontroller.trumpsuit);
+            }
             card lowestcardthatcanbeat = findlowestcardthatcanbeat(gamecontroller, currenthighest);
             if(lowestcardthatcanbeat.getsuit() != 0) return pair<bool,card>(true,lowestcardthatcanbeat);
             else return playworstcard(gamecontroller.ledsuit, gamecontroller.trumpsuit);
@@ -418,7 +444,7 @@ class trainer : public player
     pair<bool,card> playworstcard(const char &ledsuit, const char &trumpsuit)
     {
         pair<bool,card> cardtoplay(true,card(0,0));
-        card currentworstcard(0,11);
+        card currentworstcard(0,15);
         for(auto card:hand)
         {
             if(card.getsuit() == ledsuit && currentworstcard.getsuit() != ledsuit) currentworstcard = card;
@@ -442,6 +468,15 @@ class trainer : public player
         cardtoplay.second = currentbestcard;
         return cardtoplay;
     }
+    card highestcardsamesuit(gamecontroller &gamecontroller, card &currenthighest)
+    {
+        card cardtoplay(0,0);
+        for(auto card:hand)
+        {
+            if(card.getsuit() == gamecontroller.ledsuit && card.getvalue() > currenthighest.getvalue() && card.getvalue() > cardtoplay.getvalue()) cardtoplay = card;
+        }
+        return cardtoplay;
+    }
     card findlowestcardthatcanbeat(gamecontroller &gamecontroller, card &currenthighest)
     {
         card lowestcardthatcanbeat(0,15);
@@ -452,26 +487,19 @@ class trainer : public player
         //if the current highest is not trump suit
         else
         {
-            for(auto card: hand)
+            //first pass looking for ledsuit
+            for(auto card:hand)
             {
                 if(card.getsuit() == gamecontroller.ledsuit && card.getvalue() > currenthighest.getvalue() && card.getvalue() < lowestcardthatcanbeat.getvalue()) lowestcardthatcanbeat = card;
-                else if (card.getsuit() == gamecontroller.trumpsuit)
-                {
-                    if(lowestcardthatcanbeat.getsuit() == gamecontroller.ledsuit) lowestcardthatcanbeat = card;
-                    else if (lowestcardthatcanbeat.getsuit() == gamecontroller.trumpsuit)
-                    {
-                        if(gamecontroller.jackcollected)
-                        {
-                            if(card.getvalue() < lowestcardthatcanbeat.getvalue()) lowestcardthatcanbeat = card;
-                        }
-                        else
-                        {
-                            if(card.getvalue() < lowestcardthatcanbeat.getvalue() && card.getvalue() < 10) lowestcardthatcanbeat = card;
-                        }
-                    }
-                }
+            }
+            if(lowestcardthatcanbeat.getvalue() != 15) return lowestcardthatcanbeat;
+            //second pass looking for trumpsuit
+            for(auto card:hand)
+            {
+                if(card.getsuit() == gamecontroller.trumpsuit && card.getvalue() < lowestcardthatcanbeat.getvalue()) lowestcardthatcanbeat = card;
             }
         }
+        if(!gamecontroller.jackcollected && lowestcardthatcanbeat.getsuit() == gamecontroller.trumpsuit && lowestcardthatcanbeat.getvalue() > 11) return card(0,0);
         return lowestcardthatcanbeat;
     }
     void printhand()
@@ -485,7 +513,7 @@ class learner : public player
 {
     void playcard(gamecontroller &gamecontroller, bool first)
     {
-        hand.back().whoplayed = whichteam;
+        hand.back().whoplayed = whichplayer;
         gamecontroller.trick.push_back(hand.back());
         hand.pop_back();
     }
@@ -512,11 +540,11 @@ class human : public player
     void playcard(gamecontroller &gamecontroller, bool first)
     {
         printhand();
-        cout << whichteam << endl;
+        cout << whichplayer << endl;
         int index = -1;
         cout << "which card do you want to play?" << endl;
         cin >> index;
-        hand[index].whoplayed = whichteam;
+        hand[index].whoplayed = whichplayer;
         if(first) gamecontroller.ledsuit = hand[index].getsuit();
         gamecontroller.trick.push_back(hand[index]);
         if(index!=hand.size() - 1) swap(*(hand.begin() + index),hand.back());
@@ -525,12 +553,12 @@ class human : public player
     bool bet(gamecontroller &gamecontroller, const int &index)
     {
         printhand();
-        cout << whichteam << endl;
+        cout << whichplayer << endl;
         cout << "How much do you want to bet? put -1 for no" << endl;
         int x;
         cin >> x;
         if(x == -1) return false;
-        gamecontroller.whobet = whichteam;
+        gamecontroller.whobet = whichplayer;
         gamecontroller.bet = x;
         cout << "which suit" << endl;
         char suit;
@@ -577,11 +605,11 @@ void setup(vector<player*> &players, deck &carddeck, gamecontroller &gamecontrol
 {
     carddeck.makedeck();
     players.push_back(new human());
-    players[0]->whichteam = 0;
+    players[0]->whichplayer = 0;
     for(int i = 1; i < 4; ++i)
     {
         players.push_back(new trainer());
-        players[i]->whichteam = i % 2;
+        players[i]->whichplayer = i;
     }
 }
 
@@ -595,15 +623,15 @@ void dealcards(vector<player*> &players, const deck &carddeck, gamecontroller &g
 void makebets(const vector<player*> &players, gamecontroller &gamecontroller)
 {
     int currentbetter = gamecontroller.whodealt;
-    for(int i = 1; i < 4; ++i)
+    for(int i = 0; i < 3; ++i)
     {
         players[currentbetter]->bet(gamecontroller, currentbetter%2);
         currentbetter = (currentbetter + 1) % 4;
     }
+    //if nobody has bet yet, the dealer is screwed
     if(gamecontroller.bet == 0) players[currentbetter]->forcebet(gamecontroller,currentbetter);
     else players[currentbetter]->bet(gamecontroller,currentbetter);
     cout << endl;
-    cout << flush;;
 }
 
 void playtrick(const vector<player*> &players, gamecontroller &gamecontroller)
