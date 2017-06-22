@@ -186,8 +186,39 @@ class trainer : public player
     }
     void forcebet(status &status)
     {
+        printhand();
+        cout << whichplayer << endl;
         status.bet = 2;
         status.whobet = whichplayer;
+        int whichsuit[4] = {0,0,0,0};
+        for(auto card:hand)
+        {
+            if(card.getvalue() < 4) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() > 13) whichsuit[forcebethelper(card)] += 12;
+            else if(card.getvalue() > 11) whichsuit[forcebethelper(card)] += 8;
+            else if(card.getvalue() == 11) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() == 10) whichsuit[forcebethelper(card)] += 4;
+        }
+        int max = 0, index = 0;
+        for(int i = 0; i < 4; ++i)
+        {
+            if(whichsuit[i] > max)
+            {
+                index = i;
+                max = whichsuit[i];
+            }
+        }
+        if(index == 0) status.trumpsuit = 's';
+        if(index == 1) status.trumpsuit = 'c';
+        if(index == 2) status.trumpsuit = 'h';
+        if(index == 3) status.trumpsuit = 'd';
+    }
+    int forcebethelper(card helper)
+    {
+        if(helper.getsuit() == 's') return 0;
+        if(helper.getsuit() == 'c') return 1;
+        if(helper.getsuit() == 'h') return 2;
+        return 3;
     }
     void playcard(status &status, bool first)
     {
@@ -405,6 +436,7 @@ class trainer : public player
         if(status.nummovestaken == 3)
         {
             bool tenledsuit = false, tentrumpsuit = false;
+            //CAN FIND INDEXES HERE TOO
             for(auto card: hand)
             {
                 if(card.getvalue() == 10 && card.getsuit() == status.ledsuit) tenledsuit = true;
@@ -521,7 +553,20 @@ class trainer : public player
     pair<bool,int> playmostgame(const char &ledsuit, const char &trumpsuit)
     {
         int bestcard = 0;
-        for(int i = 0; i < (int)hand.size(); ++i) if(hand[i].getgame() >= hand[bestcard].getgame()) bestcard = i;
+        bool changed = false;
+        for(int i = 0; i < (int)hand.size(); ++i)
+        {
+            if(hand[i].getgame() >= hand[bestcard].getgame() && (hand[i].getsuit() == ledsuit || hand[i].getsuit() == trumpsuit))
+            {
+                bestcard = i;
+                changed = true;
+            }
+            else if(!changed && hand[i].getsuit() == ledsuit)
+            {
+                bestcard = i;
+                changed = true;
+            }
+        }
         return pair<bool,int>(true,bestcard);
     }
     int findlowestcardthatcanbeat(const char &trumpsuit, card &currenthighest)
