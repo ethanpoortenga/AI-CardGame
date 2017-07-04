@@ -95,10 +95,12 @@ struct status
         for(auto card:trick)
         {
             cardsplayed.push_back(card);
+            if(card.gethierarchy(trumpsuit) == 25) jackcollected = true;
             points[whowon % 2] += card.getgame();
         }
         cout << "Player " << whowon << " won the trick!" << endl;
         wholeads = whowon;
+        nummovestaken = 0;
         trick.clear();
     }
     void resethand()
@@ -118,7 +120,7 @@ struct status
         for(int i = 0; i < 4; ++i) jackqueenkingace[i] = false;
         points[0] = 0, points[1] = 0;
         cout << "Team 0 won " << handpoints[0] << ", Team 1 won " << handpoints[1] << endl;
-        cout << "Current Score: Team 0: " << points[0] << ", Team 1: " << points[1] << endl << endl;
+        cout << "Current Score: Team 0: " << overallscore[0] << ", Team 1: " << overallscore[1] << endl << endl;
     }
     void resetgame()
     {
@@ -177,7 +179,7 @@ class trainer : public player
         cin >> bet;
         if(bet == -1) return false;
         status.bet = bet;
-        status.whobet = index;
+        status.whobet = whichplayer;
         cout << "which suit" << endl;
         char suit;
         cin >> suit;
@@ -231,8 +233,17 @@ class trainer : public player
             return;
         }
         playablecards.clear();
-        for(auto card:hand) if(card.getsuit() == status.trumpsuit || card.getsuit() == status.ledsuit) playablecards.push_back(card);
-        if(playablecards.size() == 0) playablecards = hand;
+        bool ledsuitseen = false;
+        for(auto card:hand)
+        {
+            if(card.getsuit() == status.ledsuit)
+            {
+                playablecards.push_back(card);
+                ledsuitseen = true;
+            }
+            else if(card.getsuit() == status.trumpsuit) playablecards.push_back(card);
+        }
+        if(!ledsuitseen) playablecards = hand;
         pair<bool,card> result(false,card(0,0));
         //check to see whether the jack can be taken in
         if(!status.jackcollected) result = proirity1(status);
@@ -256,6 +267,7 @@ class trainer : public player
     void playcardhelper(pair<bool,card> &result, status &status)
     {
         result.second.whoplayed = whichplayer;
+        ++status.nummovestaken;
         cout << "Card Played: " << char(result.second.getsuit() - 32) << " " << result.second.getvalue() << endl;
         status.trick.push_back(result.second);
         for(int i = 0; i < (int)hand.size(); ++i) if(hand[i].gethierarchy(status.trumpsuit) == result.second.gethierarchy(status.trumpsuit)) hand.erase(hand.begin() + i);
@@ -309,50 +321,54 @@ class trainer : public player
             //proirity 4 = any other suit
             char trumpsuit = status.trumpsuit;
             card hightrumpsuit(0,0), highothersuit(0,0), lowtrumpsuit(0,0), anyothersuit(0,0);
-            for(int i = 0; i < (int)hand.size(); ++i)
+            for(auto card: hand)
             {
-                if(hand[i].gethierarchy(trumpsuit) > 25)
+                //hightrumpsuit
+                if(card.gethierarchy(trumpsuit) > 25) //above jack
                 {
-                    if(hightrumpsuit.getvalue() == 0) hightrumpsuit = hand[i];
-                    else if(hightrumpsuit.gethierarchy(trumpsuit) < hand[i].gethierarchy(trumpsuit)) hightrumpsuit = hand[i];
+                    if(hightrumpsuit.getvalue() == 0) hightrumpsuit = card;
+                    else if(hightrumpsuit.gethierarchy(trumpsuit) < card.gethierarchy(trumpsuit)) hightrumpsuit = card;
                 }
-                else if(hand[i].gethierarchy(trumpsuit) < 24 && hand[i].gethierarchy(trumpsuit) > 15)
+                //high other suit
+                else if(card.gethierarchy(trumpsuit) < 15 && card.gethierarchy(trumpsuit) > 10)
                 {
-                    if(lowtrumpsuit.getvalue() == 0) lowtrumpsuit = hand[i];
-                    else if(lowtrumpsuit.gethierarchy(trumpsuit) > hand[i].gethierarchy(trumpsuit)) lowtrumpsuit = hand[i];
+                    if(highothersuit.getvalue() == 0) highothersuit = card;
+                    else if(highothersuit.gethierarchy(trumpsuit) < card.gethierarchy(trumpsuit)) highothersuit = card;
                 }
-                else if(hand[i].gethierarchy(trumpsuit) > 10 && hand[i].getsuit() == status.ledsuit && status.ledsuit != status.trumpsuit)
+                //lowtrumpsuit
+                else if(card.gethierarchy(trumpsuit) < 24 && card.gethierarchy(trumpsuit) > 15)
                 {
-                    if(highothersuit.getvalue() == 0) highothersuit = hand[i];
-                    else if(highothersuit.gethierarchy(trumpsuit) < hand[i].gethierarchy(trumpsuit)) highothersuit = hand[i];
+                    if(lowtrumpsuit.getvalue() == 0) lowtrumpsuit = card;
+                    else if(lowtrumpsuit.gethierarchy(trumpsuit) > card.gethierarchy(trumpsuit)) lowtrumpsuit = card;
                 }
-                else if(hand[i].getvalue() < 10)
+                //any other suit
+                else if(card.getvalue() < 10)
                 {
-                    anyothersuit = hand[i];
+                    anyothersuit = card;
                 }
             }
-            if(hightrumpsuit.getvalue() == 15)
+            if(hightrumpsuit.getvalue() != 0)
             {
                 choice.second = hightrumpsuit;
                 status.ledsuit = hightrumpsuit.getsuit();
                 playcardhelper(choice, status);
                 return;
             }
-            if(highothersuit.getvalue() == 15)
+            if(highothersuit.getvalue() != 0)
             {
                 choice.second = highothersuit;
                 status.ledsuit = highothersuit.getsuit();
                 playcardhelper(choice, status);
                 return;
             }
-            if(lowtrumpsuit.getvalue() == 15)
+            if(lowtrumpsuit.getvalue() != 0)
             {
                 choice.second = lowtrumpsuit;
                 status.ledsuit = lowtrumpsuit.getsuit();
                 playcardhelper(choice, status);
                 return;
             }
-            if(anyothersuit.getvalue() == 15)
+            if(anyothersuit.getvalue() != 0)
             {
                 choice.second = anyothersuit;
                 status.ledsuit = anyothersuit.getsuit();
@@ -418,7 +434,7 @@ class trainer : public player
             {
                 for(int i = 3; i >=0; --i)
                 {
-                    if(cardsjackandabove[i] == 0) return pair<bool,card>(false,card(0,0));
+                    if(cardsjackandabove[i] == 0 && status.nummovestaken != 3) return pair<bool,card>(false,card(0,0));
                     else if(cardsjackandabove[i] == 2) return pair<bool,card>(true,card(trumpsuit,i+11));
                     else if(cardsjackandabove[i] == 3) return playworstcard(status.ledsuit, trumpsuit);
                 }
@@ -548,7 +564,7 @@ class trainer : public player
         {
             if(status.nummovestaken == 3) return playworstcard(status.ledsuit, status.trumpsuit);
             card cardtoplay(0,0);
-            for(int i = 0; i < (int)playablecards.size(); ++i) if(playablecards[i].gethierarchy(status.trumpsuit) > trickwinner.gethierarchy(status.trumpsuit) && playablecards[i].gethierarchy(status.trumpsuit) >= cardtoplay.gethierarchy(status.trumpsuit) && !(!status.jackcollected && playablecards[i].gethierarchy(status.trumpsuit) > 24)) cardtoplay = playablecards[i];
+            for(auto card: playablecards) if(card.gethierarchy(status.trumpsuit) > trickwinner.gethierarchy(status.trumpsuit) && card.gethierarchy(status.trumpsuit) >= cardtoplay.gethierarchy(status.trumpsuit) && !(!status.jackcollected && card.gethierarchy(status.trumpsuit) > 24)) cardtoplay = card;
             if(playablecards[0].gethierarchy(status.trumpsuit) > trickwinner.gethierarchy(status.trumpsuit)) return pair<bool,card>(true,cardtoplay);
         }
         return pair<bool,card>(true,playablecards[0]); //should never get here
@@ -556,11 +572,10 @@ class trainer : public player
     pair<bool,card> playworstcard(const char &ledsuit, const char &trumpsuit)
     {
         card worstcard(0,0);
-        for(int i = 0; i < (int)playablecards.size(); ++i)
+        for(auto card: playablecards)
         {
-            if(playablecards[i].getsuit() == ledsuit && worstcard.getsuit() != ledsuit) worstcard = playablecards[i];
-            else if (playablecards[i].getsuit() == ledsuit && worstcard.getsuit() == ledsuit && playablecards[i].getgame() <= worstcard.getgame()) worstcard = playablecards[i];
-            else if (playablecards[i].getgame() <= worstcard.getgame() && worstcard.getsuit() != ledsuit) worstcard = playablecards[i];
+            if(worstcard.getvalue() == 0) worstcard = card;
+            else if(card.gethierarchy(trumpsuit) < worstcard.gethierarchy(trumpsuit)) worstcard = card;
         }
         return pair<bool,card>(true,worstcard);
     }
@@ -696,6 +711,9 @@ int main(int argc, const char * argv[])
         dealcards(players, carddeck, status);
         makebets(players, status);
         for(int round = 0; round < 6; ++round) playtrick(players, status);
+        cout << "continue?" << endl;
+        int i;
+        cin >> i;
         status.resethand();
     }
     if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
@@ -749,8 +767,8 @@ void playtrick(const vector<player*> &players, status &status)
     players[(currplayer+3)%4]->playcard(status,false);
     cout << endl;
     status.resettrick();
-    cout << "continue?" << endl;
-    cin >> currplayer;
+//    cout << "continue?" << endl;
+//    cin >> currplayer;
     cout << endl << endl;
     cout << flush;
 }
