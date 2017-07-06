@@ -10,6 +10,8 @@
 #include <string>
 #include <algorithm>
 #include <vector>
+#include <cassert>
+#include <ctime>
 
 using namespace std;
 
@@ -53,14 +55,15 @@ struct deck
     }
     void shuffle()
     {
+        int max = 39, min = 0;
+        srand(int(time(NULL)));
         for(int i = 0; i < 7; ++i)
         {
-            srand(int(time(NULL)));
-            for(int i = 39; i > 1; --i)
+            for(int i = 0; i < 38; ++i)
             {
-                int random_number = std::rand(); // rand() return a number between ​0​ and RAND_MAX
-                random_number = random_number % i;
-                if(i != (40-i)) swap(carddeck[i], carddeck[40-i]);
+                min = i + 1;
+                int random_number = min + (rand() % static_cast<int>(max - min + 1));
+                if(i != random_number) swap(carddeck[i], carddeck[random_number]);
             }
             swap(carddeck[0], carddeck[20]);
         }
@@ -173,23 +176,80 @@ class trainer : public player
     bool bet(status &status, const int &index)
     {
         printhand();
-        cout << whichplayer << endl;
-        int bet = 0;
-        cout << "bet? put -1 for no" << endl;
-        cin >> bet;
-        if(bet == -1) return false;
-        status.bet = bet;
-        status.whobet = whichplayer;
-        cout << "which suit" << endl;
-        char suit;
-        cin >> suit;
-        status.trumpsuit = suit;
-        return true;
+        cout << "Player " << whichplayer << ": Trainer" << endl;
+        vector<int> suits = {0,0,0,0};
+        for(auto card: hand)
+        {
+            if(card.getvalue() == 14) bethelper(card.getsuit(), 10, suits);
+            if(card.getvalue() == 13) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 12) bethelper(card.getsuit(), 6, suits);
+            if(card.getvalue() == 11) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 10) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 3) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 2) bethelper(card.getsuit(), 7, suits);
+            else bethelper(card.getsuit(), 1, suits);
+        }
+        int maxstrength = 0, maxindex = 0;
+        for(int i = 0; i < 3; ++i) if(suits[i] > maxstrength)
+        {
+            maxstrength = suits[i];
+            maxindex = i;
+        }
+        if(maxstrength > 42 && status.bet < 4)
+        {
+            status.bet = 4;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 4 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 32 && status.bet < 3)
+        {
+            status.bet = 3;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 3 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 22 && status.bet < 2)
+        {
+            status.bet = 2;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 2 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        cout << "Bet 0 with strength " << maxstrength << endl << endl;
+        return false;
+    }
+    void bethelper(int suit, int worth, vector<int> &suits)
+    {
+        int suitindex;
+        if(suit == 's') suitindex = 3;
+        else if(suit == 'c') suitindex = 2;
+        else suitindex = (suit == 'h');
+        if(worth == 1) suits[suitindex] += 1;
+        else
+        {
+            for(int i = 0; i < 3; ++i)
+            {
+                if(i == suitindex) suits[i] += worth;
+                else suits[i] += worth*0.5;
+            }
+        }
+    }
+    void settrumpsuit(int suit, status status)
+    {
+        if(suit == 3) status.trumpsuit = 's';
+        if(suit == 2) status.trumpsuit = 'c';
+        if(suit == 1) status.trumpsuit = 'h';
+        status.trumpsuit = 'd';
     }
     void forcebet(status &status)
     {
         printhand();
         cout << whichplayer << endl;
+        cout << "Forced to bet" << endl << endl;
         status.bet = 2;
         status.whobet = whichplayer;
         int whichsuit[4] = {0,0,0,0};
@@ -266,6 +326,7 @@ class trainer : public player
     }
     void playcardhelper(pair<bool,card> &result, status &status)
     {
+        assert(result.second.getsuit() != 0);
         result.second.whoplayed = whichplayer;
         ++status.nummovestaken;
         cout << "Card Played: " << char(result.second.getsuit() - 32) << " " << result.second.getvalue() << endl;
@@ -418,7 +479,7 @@ class trainer : public player
             int couldtakein = -1;
             if(myteamwinning)
             {
-                if(status.nummovestaken == 3) return playmostgame(status.ledsuit, trumpsuit);
+                if(status.nummovestaken == 3) return playmostgame(status.ledsuit, trumpsuit, winningtrick);
                 for(int i = 3; i >=0; --i)
                 {
                     if(cardsjackandabove[i] == 0)
@@ -427,7 +488,7 @@ class trainer : public player
                         else return pair<bool,card>(true,card(trumpsuit,i+11));
                     }
                     if(cardsjackandabove[i] == 2) couldtakein = i;
-                    else if(cardsjackandabove[i] == 3) return playmostgame(status.ledsuit, trumpsuit);
+                    else if(cardsjackandabove[i] == 3) return playmostgame(status.ledsuit, trumpsuit, winningtrick);
                 }
             }
             else
@@ -505,7 +566,7 @@ class trainer : public player
             //my team winning
             if(myteamwinning)
             {
-                if(status.nummovestaken == 3) return playmostgame(status.ledsuit, status.trumpsuit);
+                if(status.nummovestaken == 3) return playmostgame(status.ledsuit, status.trumpsuit, winningtrick);
                 if(gameintrick >= 10)
                 {
                     card currentmax(0,0);
@@ -579,29 +640,23 @@ class trainer : public player
         }
         return pair<bool,card>(true,worstcard);
     }
-    pair<bool,card> playmostgame(const char &ledsuit, const char &trumpsuit)
+    pair<bool,card> playmostgame(const char &ledsuit, const char &trumpsuit, card winningcard)
     {
-        card bestcard(0,0);
-        bool changed = false;
-        for(int i = 0; i < (int)playablecards.size(); ++i)
-        {
-            if(playablecards[i].getgame() >= bestcard.getgame() && (playablecards[i].getsuit() == ledsuit || playablecards[i].getsuit() == trumpsuit))
-            {
-                bestcard = playablecards[i];
-                changed = true;
-            }
-            else if(!changed && playablecards[i].getsuit() == ledsuit)
-            {
-                bestcard = playablecards[i];
-                changed = true;
-            }
-        }
+        card bestcard = playworstcard(ledsuit, trumpsuit).second;
+        for(int i = 1; i < (int)playablecards.size(); ++i) if(playablecards[i].getgame() >= bestcard.getgame() && winningcard.gethierarchy(trumpsuit) > playablecards[i].gethierarchy(trumpsuit)) bestcard = playablecards[i];
         return pair<bool,card>(true,bestcard);
     }
     card findlowestcardthatcanbeat(const char &trumpsuit, card &currenthighest)
     {
-        card lowestthatcanbeat(0,15);
-        for(int i = 0; i < (int)playablecards.size(); ++i) if(lowestthatcanbeat.gethierarchy(trumpsuit) > currenthighest.gethierarchy(trumpsuit) && lowestthatcanbeat.gethierarchy(trumpsuit) < lowestthatcanbeat.gethierarchy(trumpsuit))lowestthatcanbeat = playablecards[i];
+        card lowestthatcanbeat(0,-1);
+        for(auto card: playablecards)
+        {
+            if(card.gethierarchy(trumpsuit) > currenthighest.gethierarchy(trumpsuit))
+            {
+                if(lowestthatcanbeat.getsuit() == 0) lowestthatcanbeat = card;
+                else if (card.gethierarchy(trumpsuit) < lowestthatcanbeat.gethierarchy(trumpsuit)) lowestthatcanbeat = card;
+            }
+        }
         return lowestthatcanbeat;
     }
     void printhand()
@@ -669,7 +724,7 @@ class human : public player
     bool bet(status &status, const int &index)
     {
         printhand();
-        cout << whichplayer << endl;
+        cout << "Player " << whichplayer << ": Human" << endl;
         cout << "How much do you want to bet? put -1 for no" << endl;
         int x;
         cin >> x;
@@ -711,9 +766,6 @@ int main(int argc, const char * argv[])
         dealcards(players, carddeck, status);
         makebets(players, status);
         for(int round = 0; round < 6; ++round) playtrick(players, status);
-        cout << "continue?" << endl;
-        int i;
-        cin >> i;
         status.resethand();
     }
     if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
