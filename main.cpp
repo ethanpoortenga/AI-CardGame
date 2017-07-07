@@ -56,7 +56,7 @@ struct deck
     void shuffle()
     {
         int max = 39, min = 0;
-        srand(int(time(NULL)));
+        srand(int(time(NULL))+int(time(NULL)));
         for(int i = 0; i < 7; ++i)
         {
             for(int i = 0; i < 38; ++i)
@@ -238,12 +238,12 @@ class trainer : public player
             }
         }
     }
-    void settrumpsuit(int suit, status status)
+    void settrumpsuit(int suit, status &status)
     {
         if(suit == 3) status.trumpsuit = 's';
         if(suit == 2) status.trumpsuit = 'c';
         if(suit == 1) status.trumpsuit = 'h';
-        status.trumpsuit = 'd';
+        if(suit == 0) status.trumpsuit = 'd';
     }
     void forcebet(status &status)
     {
@@ -303,6 +303,11 @@ class trainer : public player
             }
             else if(card.getsuit() == status.trumpsuit) playablecards.push_back(card);
         }
+        if(playablecards.size() == 1)
+        {
+            playcardhelper(pair<bool,card>(true,playablecards[0]), status);
+            return;
+        }
         if(!ledsuitseen) playablecards = hand;
         pair<bool,card> result(false,card(0,0));
         //check to see whether the jack can be taken in
@@ -324,14 +329,14 @@ class trainer : public player
         playcardhelper(result, status);
         return;
     }
-    void playcardhelper(pair<bool,card> &result, status &status)
+    void playcardhelper(pair<bool,card> result, status &status)
     {
         assert(result.second.getsuit() != 0);
         result.second.whoplayed = whichplayer;
         ++status.nummovestaken;
         cout << "Card Played: " << char(result.second.getsuit() - 32) << " " << result.second.getvalue() << endl;
         status.trick.push_back(result.second);
-        for(int i = 0; i < (int)hand.size(); ++i) if(hand[i].gethierarchy(status.trumpsuit) == result.second.gethierarchy(status.trumpsuit)) hand.erase(hand.begin() + i);
+        for(int i = 0; i < (int)hand.size(); ++i) if(hand[i].getsuit() == result.second.getsuit() && hand[i].getvalue() == result.second.getvalue()) hand.erase(hand.begin() + i);
     }
     void leadout(status &status)
     {
@@ -341,10 +346,10 @@ class trainer : public player
         if(status.cardsplayed.size() == 0)
         {
             card greaterthanjack(status.trumpsuit,11), lessthanten(status.trumpsuit,10);
-            for(int i = 0; i < 6; ++i)
+            for(auto card: hand)
             {
-                if(hand[i].gethierarchy(status.trumpsuit) > greaterthanjack.gethierarchy(status.trumpsuit))greaterthanjack = hand[i];
-                if(hand[i].gethierarchy(status.trumpsuit) < lessthanten.gethierarchy(status.trumpsuit) && hand[i].gethierarchy(status.trumpsuit) > 15) lessthanten = hand[i];
+                if(card.gethierarchy(status.trumpsuit) > greaterthanjack.gethierarchy(status.trumpsuit))greaterthanjack = card;
+                if(card.gethierarchy(status.trumpsuit) < lessthanten.gethierarchy(status.trumpsuit) && card.gethierarchy(status.trumpsuit) > 15) lessthanten = card;
             }
             if(greaterthanjack.getvalue() != 11)
             {
@@ -576,7 +581,7 @@ class trainer : public player
                 if(gameintrick < 10)
                 {
                     card cardtoplay = findlowestcardthatcanbeat(status.trumpsuit, winningtrick);
-                    if(cardtoplay.getvalue() != 15) return pair<bool,card>(true,cardtoplay);
+                    if(cardtoplay.getvalue() != -1) return pair<bool,card>(true,cardtoplay);
                 }
                 return pair<bool,card>(false,card(0,0));
             }
@@ -598,7 +603,7 @@ class trainer : public player
                 if(gameintrick < 10)
                 {
                     cardtoplay = findlowestcardthatcanbeat(status.trumpsuit, winningtrick);
-                    if(cardtoplay.getvalue() != 15) return pair<bool,card>(true,cardtoplay);
+                    if(cardtoplay.getvalue() != -1) return pair<bool,card>(true,cardtoplay);
                 }
                 return pair<bool,card>(false,card(0,0));
             }
