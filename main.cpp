@@ -56,7 +56,13 @@ struct deck
     void shuffle()
     {
         int max = 39, min = 0;
-        srand(int(time(NULL))+int(time(NULL)));
+        srand(int(time(NULL)));
+        time_t currenttime;
+        struct tm *localtimeeee;
+        time(&currenttime);
+        localtimeeee = localtime(&currenttime);
+        int seconds = localtimeeee->tm_sec;
+        
         for(int i = 0; i < 7; ++i)
         {
             for(int i = 0; i < 38; ++i)
