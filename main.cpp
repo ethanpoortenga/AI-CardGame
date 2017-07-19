@@ -51,18 +51,12 @@ struct deck
         for(int i = 9; i < 15; ++i) carddeck.push_back(card('h',i)); //hearts
         for(int i = 2; i < 6; ++i) carddeck.push_back(card('d',i)); //diamonds
         for(int i = 9; i < 15; ++i) carddeck.push_back(card('d',i)); //diamonds
+        seedrand();
         shuffle();
     }
     void shuffle()
     {
         int max = 39, min = 0;
-        srand(int(time(NULL)));
-        time_t currenttime;
-        struct tm *localtimeeee;
-        time(&currenttime);
-        localtimeeee = localtime(&currenttime);
-        int seconds = localtimeeee->tm_sec;
-        
         for(int i = 0; i < 7; ++i)
         {
             for(int i = 0; i < 38; ++i)
@@ -74,7 +68,18 @@ struct deck
             swap(carddeck[0], carddeck[20]);
         }
     }
+    void seedrand()
+    {
+        time_t currenttime;
+        struct tm *localtime_;
+        time(&currenttime);
+        localtime_ = localtime(&currenttime);
+        int randseed = localtime_->tm_sec + 61 * localtime_->tm_min + 241 * localtime_->tm_hour;
+        srand(randseed);
+        seed = randseed;
+    }
     vector<card> carddeck;
+    int seed;
 };
 
 struct status
@@ -97,9 +102,7 @@ struct status
     {
         int whowon = findtrickwinner().whoplayed;
         //if team 1 won
-        if(whowon % 2 == 0) for(auto card:trick) card.whotookin = wholeads;
-        //if team 2 won
-        else for(auto card:trick) card.whotookin = (wholeads+1)%2;
+        for(auto &card:trick) card.whotookin = (whowon % 2);
         //clean up
         for(auto card:trick)
         {
@@ -119,7 +122,7 @@ struct status
         ++handpoints[findhighestcard()];
         ++handpoints[findlowestcard()];
         if(jackcollected) ++handpoints[findjack()];
-        if(points[0] != points[1]) ++handpoints[findgame()];
+        if(points[0] != points[1]) ++handpoints[(points[0] < points[1])];
         //adjust the overall team score accordingly
         if(handpoints[whobet % 2] >= bet) for(int i = 0; i < 2; ++i) overallscore[i] += handpoints[i];
         else overallscore[whobet % 2] -= bet;
@@ -128,8 +131,9 @@ struct status
         jackcollected = false;
         for(int i = 0; i < 4; ++i) jackqueenkingace[i] = false;
         points[0] = 0, points[1] = 0;
-        cout << "Team 0 won " << handpoints[0] << ", Team 1 won " << handpoints[1] << endl;
-        cout << "Current Score: Team 0: " << overallscore[0] << ", Team 1: " << overallscore[1] << endl << endl;
+        bet = 0;
+        cout << "Team A won " << handpoints[0] << ", Team B won " << handpoints[1] << endl;
+        cout << "Current Score: Team A: " << overallscore[0] << ", Team B: " << overallscore[1] << endl << endl;
     }
     void resetgame()
     {
@@ -158,10 +162,6 @@ struct status
     {
         for(auto card:cardsplayed) if(card.getvalue() == 11 && card.getsuit() == trumpsuit) return (card.whotookin);
         return -1; //will never get here but for compile reasons
-    }
-    int findgame()        //return 0 = team1, 1 = team2
-    {
-        return(points[0] < points[1]);
     }
 };
 
@@ -774,6 +774,7 @@ int main(int argc, const char * argv[])
     setup(players, carddeck, status);
     while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
     {
+        carddeck.shuffle();
         dealcards(players, carddeck, status);
         makebets(players, status);
         for(int round = 0; round < 6; ++round) playtrick(players, status);
@@ -781,6 +782,7 @@ int main(int argc, const char * argv[])
     }
     if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
     else cout << "You win!! Congrats" << endl;
+    cout << carddeck.seed;
     return 0;
 }
 
@@ -830,8 +832,6 @@ void playtrick(const vector<player*> &players, status &status)
     players[(currplayer+3)%4]->playcard(status,false);
     cout << endl;
     status.resettrick();
-//    cout << "continue?" << endl;
-//    cin >> currplayer;
     cout << endl << endl;
     cout << flush;
 }
