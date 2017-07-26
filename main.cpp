@@ -12,6 +12,7 @@
 #include <vector>
 #include <cassert>
 #include <ctime>
+#include <fstream>
 
 using namespace std;
 
@@ -77,6 +78,7 @@ struct deck
         int randseed = localtime_->tm_sec + 61 * localtime_->tm_min + 241 * localtime_->tm_hour;
         srand(randseed);
         seed = randseed;
+        cout << "Random Seed: " << randseed << endl << endl;
     }
     vector<card> carddeck;
     int seed;
@@ -84,6 +86,8 @@ struct deck
 
 struct status
 {
+    //FOR THE LEARNER
+    vector<int> gamestatus;
     //FOR THE GAME OVERALL
     int overallscore[2] = {0,0}, whodealt = -1;
     //FOR THE HAND
@@ -178,7 +182,6 @@ public:
 
 class trainer : public player
 {
-    //STILL NEED TO IMPLEMENT THIS LOGIC
     bool bet(status &status, const int &index)
     {
         printhand();
@@ -682,27 +685,146 @@ private:
 
 class learner : public player
 {
+    learner()
+    {
+        initialize();
+    }
     bool bet(status &status, const int &index)
     {
-        status.bet = 2;
-        status.whobet = index;
-        return true;
+        printhand();
+        cout << "Player " << whichplayer << ": Trainer" << endl;
+        vector<int> suits = {0,0,0,0};
+        for(auto card: hand)
+        {
+            if(card.getvalue() == 14) bethelper(card.getsuit(), 10, suits);
+            if(card.getvalue() == 13) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 12) bethelper(card.getsuit(), 6, suits);
+            if(card.getvalue() == 11) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 10) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 3) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 2) bethelper(card.getsuit(), 7, suits);
+            else bethelper(card.getsuit(), 1, suits);
+        }
+        int maxstrength = 0, maxindex = 0;
+        for(int i = 0; i < 3; ++i) if(suits[i] > maxstrength)
+        {
+            maxstrength = suits[i];
+            maxindex = i;
+        }
+        if(maxstrength > 42 && status.bet < 4)
+        {
+            status.bet = 4;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 4 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 32 && status.bet < 3)
+        {
+            status.bet = 3;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 3 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 22 && status.bet < 2)
+        {
+            status.bet = 2;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 2 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        cout << "Bet 0 with strength " << maxstrength << endl << endl;
+        return false;
+    }
+    void bethelper(int suit, int worth, vector<int> &suits)
+    {
+        int suitindex;
+        if(suit == 's') suitindex = 3;
+        else if(suit == 'c') suitindex = 2;
+        else suitindex = (suit == 'h');
+        if(worth == 1) suits[suitindex] += 1;
+        else
+        {
+            for(int i = 0; i < 3; ++i)
+            {
+                if(i == suitindex) suits[i] += worth;
+                else suits[i] += worth*0.5;
+            }
+        }
+    }
+    void settrumpsuit(int suit, status &status)
+    {
+        if(suit == 3) status.trumpsuit = 's';
+        if(suit == 2) status.trumpsuit = 'c';
+        if(suit == 1) status.trumpsuit = 'h';
+        if(suit == 0) status.trumpsuit = 'd';
     }
     void forcebet(status &status)
     {
+        printhand();
+        cout << whichplayer << endl;
+        cout << "Forced to bet" << endl << endl;
         status.bet = 2;
         status.whobet = whichplayer;
+        int whichsuit[4] = {0,0,0,0};
+        for(auto card:hand)
+        {
+            if(card.getvalue() < 4) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() > 13) whichsuit[forcebethelper(card)] += 12;
+            else if(card.getvalue() > 11) whichsuit[forcebethelper(card)] += 8;
+            else if(card.getvalue() == 11) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() == 10) whichsuit[forcebethelper(card)] += 4;
+        }
+        int max = 0, index = 0;
+        for(int i = 0; i < 4; ++i)
+        {
+            if(whichsuit[i] > max)
+            {
+                index = i;
+                max = whichsuit[i];
+            }
+        }
+        if(index == 0) status.trumpsuit = 's';
+        if(index == 1) status.trumpsuit = 'c';
+        if(index == 2) status.trumpsuit = 'h';
+        if(index == 3) status.trumpsuit = 'd';
+    }
+    int forcebethelper(card helper)
+    {
+        if(helper.getsuit() == 's') return 0;
+        if(helper.getsuit() == 'c') return 1;
+        if(helper.getsuit() == 'h') return 2;
+        return 3;
+    }
+    void initialize()
+    {
+        double weight;
+        ifstream weightinput("weights.txt");
+        for(int i = 0; i < 80; ++i)
+        {
+            layer1weights.push_back(vector<double>(120));
+            for(int j = 0; j < 120; ++j)
+            {
+                weightinput >> weight;
+                layer1weights[i].push_back(weight);
+            }
+        }
+        for(int i = 0; i < 6; ++i)
+        {
+            layer2weights.push_back(vector<double>(120));
+            for(int j = 0; j < 80; ++j)
+            {
+                weightinput >> weight;
+                layer2weights[i].push_back(weight);
+            }
+        }
     }
     void playcard(status &status, bool first)
     {
-        hand.back().whoplayed = whichplayer;
-        status.trick.push_back(hand.back());
-        hand.pop_back();
+        vector<double> output;
     }
-//    vector<double> getcardchoices()
-//    {
-//        
-//    }
     void printhand()
     {
         cout << "Hand: ";
@@ -710,14 +832,58 @@ class learner : public player
         cout << endl;
     }
 private:
-    vector<vector<double>> layer1weights;
-    vector<vector<double>> layer2weights;
+    vector<vector<double>> layer1weights; //120 rows, 80 columns
+    vector<vector<double>> layer2weights; //80 rows, 6 columns
     vector<int> inputneurons;//first 40 = hand, second 40 = trick, third 40 = collected;
     vector<int> hiddenlayer;
     vector<int> outputlayer;
 };
 
 class human : public player
+{
+    void playcard(status &status, bool first)
+    {
+        cout << "Player " << whichplayer << ": You" << endl;
+        printhand();
+        int index = -1;
+        cout << "which card do you want to play?" << endl;
+        cin >> index;
+        hand[index].whoplayed = whichplayer;
+        if(first) status.ledsuit = hand[index].getsuit();
+        status.trick.push_back(hand[index]);
+        if(index!=hand.size() - 1) swap(*(hand.begin() + index),hand.back());
+        hand.pop_back();
+    }
+    bool bet(status &status, const int &index)
+    {
+        printhand();
+        cout << "Player " << whichplayer << ": Human" << endl;
+        cout << "How much do you want to bet? put -1 for no" << endl;
+        int x;
+        cin >> x;
+        if(x == -1) return false;
+        status.whobet = whichplayer;
+        status.bet = x;
+        cout << "which suit" << endl;
+        char suit;
+        cin >> suit;
+        status.trumpsuit = suit;
+        return true;
+    }
+    void forcebet(status &status)
+    {
+        status.bet = 2;
+        status.whobet = whichplayer;
+    }
+    void printhand()
+    {
+        cout << "Hand: ";
+        for(auto card:hand) cout << char(card.getsuit() - 32) << " " << card.getvalue() << "   ";
+        cout << endl;
+    }
+};
+
+class bruteforce : public player
 {
     void playcard(status &status, bool first)
     {
@@ -768,21 +934,26 @@ void playtrick(const vector<player*> &players, status &status);
 
 int main(int argc, const char * argv[])
 {
-    deck carddeck;
-    vector<player*> players;
-    status status;
-    setup(players, carddeck, status);
-    while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
+    ofstream weightoutput("output.txt");
+    for(int i = 0; i < 3; ++i)
     {
-        carddeck.shuffle();
-        dealcards(players, carddeck, status);
-        makebets(players, status);
-        for(int round = 0; round < 6; ++round) playtrick(players, status);
-        status.resethand();
+        deck carddeck;
+        vector<player*> players;
+        status status;
+        setup(players, carddeck, status);
+        while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
+        {
+            carddeck.shuffle();
+            dealcards(players, carddeck, status);
+            makebets(players, status);
+            for(int round = 0; round < 6; ++round) playtrick(players, status);
+            status.resethand();
+        }
+        if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
+        else cout << "You win!! Congrats" << endl;
     }
-    if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
-    else cout << "You win!! Congrats" << endl;
-    cout << carddeck.seed;
+    remove("weights.txt");
+    rename("output.txt","weights.txt");
     return 0;
 }
 
