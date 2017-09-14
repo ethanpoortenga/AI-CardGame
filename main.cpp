@@ -208,18 +208,224 @@ struct status
     }
 };
 
+class neuralnetwork
+{
+public:
+    neuralnetwork() : weightinput("weights.txt"), weightoutput("output.txt"), datainput("training.txt")
+    {
+        double weight;
+        for(int i = 0; i < 80; ++i)
+        {
+            layer1weights.push_back(vector<double>(120));
+            for(int j = 0; j < 120; ++j)
+            {
+                weightinput >> weight;
+                layer1weights[i].push_back(weight);
+            }
+        }
+        for(int i = 0; i < 6; ++i)
+        {
+            layer2weights.push_back(vector<double>(120));
+            for(int j = 0; j < 80; ++j)
+            {
+                weightinput >> weight;
+                layer2weights[i].push_back(weight);
+            }
+        }
+    }
+    ~neuralnetwork()
+    {
+        for(int i = 0; i < 80; ++i) for(int j = 0; j < 120; ++j) weightoutput << layer1weights[i][j] << " ";
+        for(int i = 0; i < 6; ++i) for(int j = 0; j < 80; ++j) weightoutput << layer2weights[i][j] << " ";
+        remove("weights.txt");
+        rename("output.txt","weights.txt");
+    }
+    void learn()
+    {
+        int trainingline = 0;
+        while(trainingline < 10000)
+        {
+            for(int i = 0; i < 120; ++i) datainput >> inputneurons[i];
+            for(int i = 0; i < 6; ++i) datainput >> actualoutput[i];
+            compute();
+            backpropagate();
+            if(trainingline % 100 == 0) cout << trainingline++/100 << endl;
+        }
+    }
+    vector<double> compute()
+    {
+        hiddenlayer.resize(80);
+        for(int i = 0; i < 80; ++i)
+        {
+            hiddenlayer[i] = 0;
+            for(int j = 0; j < 120; ++j) hiddenlayer[i] += inputneurons[j] * layer1weights[i][j];
+        }
+        //activation function for hidden layer neurons
+        for(int i = 0; i < 80; ++i) hiddenlayer[i] = 1 / (1 + pow(2.71828182846, -1 * hiddenlayer[i]));
+        for(int i = 0; i < 6; ++i)
+        {
+            outputlayer[i] = 0;
+            for(int j = 0; j < 80; ++j) outputlayer[i] += hiddenlayer[j] * layer2weights[i][j];
+        }
+        //output is weights in doubles
+        for(int i = 0; i < 6; ++i) outputlayer[i] = 1 / (1 + pow(2.71828182846, -1 * outputlayer[i]));
+        return outputlayer;
+    }
+    void backpropagate()
+    {
+        vector<double> targetoutput(6);
+        for(int i = 0; i < 6; ++i) cin >> targetoutput[i];
+        //compute layer 2
+        for(int i = 0; i < 6; i++)
+        {
+            double constant = 0.05*(targetoutput[i]-outputlayer[i])*outputlayer[i]*(1-outputlayer[i]);
+            for(int j = 0; j < 80; ++j) layer2weights[i][j] = constant*hiddenlayer[j];
+        }
+        //compute layer 1
+        for(int i = 0; i < 80; ++i)
+        {
+            double constant = 0.05;
+            for(int j = 0; j < 6; ++j)
+            {
+                constant *= (targetoutput[j]-outputlayer[j])*(1-outputlayer[j])*(outputlayer[j]);
+                layer1weights[i][j] += constant;
+            }
+        }
+    }
+    void setinputneurons(vector<int> _inputneurons) { inputneurons = _inputneurons; }
+private:
+    vector<vector<double>> layer1weights; //120 rows, 80 columns
+    vector<vector<double>> layer2weights; //80 rows, 6 columns
+    vector<int> inputneurons;//first 40 = hand, second 40 = trick, third 40 = collected;
+    vector<double> hiddenlayer;
+    vector<double> outputlayer;
+    vector<int> actualoutput;
+    ifstream weightinput;
+    ifstream datainput;
+    ofstream weightoutput;
+};
+
 class player
 {
 public:
-    virtual bool bet(status &status, const int &index) = 0;
-    virtual void forcebet(status &status) = 0;
-    virtual void playcard(status &status, bool first) = 0;
+    bool bet(status &status, const int &index)
+    {
+        printhand();
+        cout << "Player " << whichplayer << ": Trainer" << endl;
+        vector<int> suits = {0,0,0,0};
+        for(auto card: hand)
+        {
+            if(card.getvalue() == 14) bethelper(card.getsuit(), 10, suits);
+            if(card.getvalue() == 13) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 12) bethelper(card.getsuit(), 6, suits);
+            if(card.getvalue() == 11) bethelper(card.getsuit(), 9, suits);
+            if(card.getvalue() == 10) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 3) bethelper(card.getsuit(), 4, suits);
+            if(card.getvalue() == 2) bethelper(card.getsuit(), 7, suits);
+            else bethelper(card.getsuit(), 1, suits);
+        }
+        int maxstrength = 0, maxindex = 0;
+        for(int i = 0; i < 3; ++i) if(suits[i] > maxstrength)
+        {
+            maxstrength = suits[i];
+            maxindex = i;
+        }
+        if(maxstrength > 42 && status.bet < 4)
+        {
+            status.bet = 4;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 4 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 32 && status.bet < 3)
+        {
+            status.bet = 3;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 3 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        if(maxstrength > 22 && status.bet < 2)
+        {
+            status.bet = 2;
+            status.whobet = whichplayer;
+            settrumpsuit(maxindex,status);
+            cout << "Bet 2 with strength " << maxstrength << endl << endl;
+            return true;
+        }
+        cout << "Bet 0 with strength " << maxstrength << endl << endl;
+        return false;
+    }
+    void bethelper(int suit, int worth, vector<int> &suits)
+    {
+        int suitindex;
+        if(suit == 's') suitindex = 3;
+        else if(suit == 'c') suitindex = 2;
+        else suitindex = (suit == 'h');
+        if(worth == 1) suits[suitindex] += 1;
+        else
+        {
+            for(int i = 0; i < 3; ++i)
+            {
+                if(i == suitindex) suits[i] += worth;
+                else suits[i] += worth*0.5;
+            }
+        }
+    }
+    void settrumpsuit(int suit, status &status)
+    {
+        if(suit == 3) status.trumpsuit = 's';
+        if(suit == 2) status.trumpsuit = 'c';
+        if(suit == 1) status.trumpsuit = 'h';
+        if(suit == 0) status.trumpsuit = 'd';
+    }
+    void forcebet(status &status)
+    {
+        printhand();
+        cout << whichplayer << endl;
+        cout << "Forced to bet" << endl << endl;
+        status.bet = 2;
+        status.whobet = whichplayer;
+        int whichsuit[4] = {0,0,0,0};
+        for(auto card:hand)
+        {
+            if(card.getvalue() < 4) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() > 13) whichsuit[forcebethelper(card)] += 12;
+            else if(card.getvalue() > 11) whichsuit[forcebethelper(card)] += 8;
+            else if(card.getvalue() == 11) whichsuit[forcebethelper(card)] += 6;
+            else if(card.getvalue() == 10) whichsuit[forcebethelper(card)] += 4;
+        }
+        int max = 0, index = 0;
+        for(int i = 0; i < 4; ++i)
+        {
+            if(whichsuit[i] > max)
+            {
+                index = i;
+                max = whichsuit[i];
+            }
+        }
+        if(index == 0) status.trumpsuit = 's';
+        if(index == 1) status.trumpsuit = 'c';
+        if(index == 2) status.trumpsuit = 'h';
+        if(index == 3) status.trumpsuit = 'd';
+    }
+    int forcebethelper(card helper)
+    {
+        if(helper.getsuit() == 's') return 0;
+        if(helper.getsuit() == 'c') return 1;
+        if(helper.getsuit() == 'h') return 2;
+        return 3;
+    }
+    vector<card> gethand();
+    vector<int> getchoice();
+    virtual void playcard(status &status, bool first, const bool &forgenerating) = 0;
     virtual void printhand() = 0;
     vector<card> hand;
     int whichplayer = 0;
 };
 
-class trainer : public player
+class rulesbased : public player
 {
     bool bet(status &status, const int &index)
     {
@@ -330,14 +536,14 @@ class trainer : public player
         if(helper.getsuit() == 'h') return 2;
         return 3;
     }
-    void playcard(status &status, bool first)
+    void playcard(status &status, bool first, const bool &forgenerating)
     {
         cout << "Player " << whichplayer << ": Trainer" << endl;
         printhand();
         //if first player lead out (different logic)
         if(first)
         {
-            leadout(status);
+            leadout(status, forgenerating);
             return;
         }
         playablecards.clear();
@@ -353,7 +559,7 @@ class trainer : public player
         }
         if(playablecards.size() == 1)
         {
-            playcardhelper(pair<bool,card>(true,playablecards[0]), status);
+            playcardhelper(pair<bool,card>(true,playablecards[0]), status, forgenerating);
             return;
         }
         if(!ledsuitseen) playablecards = hand;
@@ -362,31 +568,42 @@ class trainer : public player
         if(!status.jackcollected) result = proirity1(status);
         if(result.first == true)
         {
-            playcardhelper(result, status);
+            playcardhelper(result, status, forgenerating);
             return;
         }
         //check to see whether a significant amount of game can be taken in/contributed
         result = proirity2(status);
         if(result.first == true)
         {
-            playcardhelper(result, status);
+            playcardhelper(result, status, forgenerating);
             return;
         }
         // attempt to take in the trick, if not possible return worst card
         result = proirity3(status);
-        playcardhelper(result, status);
+        playcardhelper(result, status, forgenerating);
         return;
     }
-    void playcardhelper(pair<bool,card> result, status &status)
+    void playcardhelper(pair<bool,card> result, status &status, const bool &forgenerating)
     {
+        lastchoice.clear();
         assert(result.second.getsuit() != 0);
         result.second.whoplayed = whichplayer;
         ++status.nummovestaken;
-        cout << "Card Played: " << char(result.second.getsuit() - 32) << " " << result.second.getvalue() << endl;
+        cout <<"Card Played: "<<char(result.second.getsuit() - 32)<< " " << result.second.getvalue() << endl;
         status.trick.push_back(result.second);
-        for(int i = 0; i < (int)hand.size(); ++i) if(hand[i].getsuit() == result.second.getsuit() && hand[i].getvalue() == result.second.getvalue()) hand.erase(hand.begin() + i);
+        int handsize = (int)hand.size();
+        for(int i = 0; i < handsize; ++i)
+        {
+            if(hand[i].getsuit()== result.second.getsuit() && hand[i].getvalue() == result.second.getvalue())
+            {
+                hand.erase(hand.begin() + i);
+                lastchoice.push_back(1);
+            }
+            lastchoice.push_back(0);
+        }
+        for(int i = 0; i < 6 - handsize; ++i) lastchoice.push_back(0);
     }
-    void leadout(status &status)
+    void leadout(status &status, const bool &forgenerating)
     {
         pair<bool,card> choice(true,card(0,0));
         choice.first = true;
@@ -403,14 +620,14 @@ class trainer : public player
             {
                 choice.second = greaterthanjack;
                 status.ledsuit = status.trumpsuit;
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             if(lessthanten.getvalue() != 11)
             {
                 choice.second = lessthanten;
                 status.ledsuit = status.trumpsuit;
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             else
@@ -421,7 +638,7 @@ class trainer : public player
                     {
                         choice.second = card;
                         status.ledsuit = status.trumpsuit;
-                        playcardhelper(choice, status);
+                        playcardhelper(choice, status, forgenerating);
                     }
                 }
             }
@@ -465,34 +682,34 @@ class trainer : public player
             {
                 choice.second = hightrumpsuit;
                 status.ledsuit = hightrumpsuit.getsuit();
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             if(highothersuit.getvalue() != 0)
             {
                 choice.second = highothersuit;
                 status.ledsuit = highothersuit.getsuit();
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             if(lowtrumpsuit.getvalue() != 0)
             {
                 choice.second = lowtrumpsuit;
                 status.ledsuit = lowtrumpsuit.getsuit();
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             if(anyothersuit.getvalue() != 0)
             {
                 choice.second = anyothersuit;
                 status.ledsuit = anyothersuit.getsuit();
-                playcardhelper(choice, status);
+                playcardhelper(choice, status, forgenerating);
                 return;
             }
             //should never get here but for compile reasons
             choice.second = hand[0];
             status.ledsuit = hand[0].getsuit();
-            playcardhelper(choice, status);
+            playcardhelper(choice, status, forgenerating);
             return;
         }
     }
@@ -718,207 +935,34 @@ class trainer : public player
         for(auto card:hand) cout << char(card.getsuit() - 32) << " " << card.getvalue() << "   ";
         cout << endl;
     }
-    void binaryoutput(card cardplayed)
-    {
-        int size = (int)hand.size();
-        for(int i = 0; i < size; ++i) cout << (hand[i] == cardplayed) << " ";
-        for(int i = 0; i < (6-size); ++i) cout << 0 << " ";
-        cout << endl;
-    }
+    vector<card> gethand() { return hand; }
+    vector<int> getchoice() { return lastchoice; }
 private:
     vector<card> playablecards;
+    vector<int> lastchoice;
 };
 
-class learner : public player
+class nnplayer : public player
 {
-    learner()
+    nnplayer(neuralnetwork* _ann) : ann(_ann) {};
+    void playcard(status &status, bool first, const bool &forgenerating)
     {
-        initialize();
-    }
-    bool bet(status &status, const int &index)
-    {
-        printhand();
-        cout << "Player " << whichplayer << ": Trainer" << endl;
-        vector<int> suits = {0,0,0,0};
-        for(auto card: hand)
-        {
-            if(card.getvalue() == 14) bethelper(card.getsuit(), 10, suits);
-            if(card.getvalue() == 13) bethelper(card.getsuit(), 9, suits);
-            if(card.getvalue() == 12) bethelper(card.getsuit(), 6, suits);
-            if(card.getvalue() == 11) bethelper(card.getsuit(), 9, suits);
-            if(card.getvalue() == 10) bethelper(card.getsuit(), 4, suits);
-            if(card.getvalue() == 3) bethelper(card.getsuit(), 4, suits);
-            if(card.getvalue() == 2) bethelper(card.getsuit(), 7, suits);
-            else bethelper(card.getsuit(), 1, suits);
-        }
-        int maxstrength = 0, maxindex = 0;
-        for(int i = 0; i < 3; ++i) if(suits[i] > maxstrength)
-        {
-            maxstrength = suits[i];
-            maxindex = i;
-        }
-        if(maxstrength > 42 && status.bet < 4)
-        {
-            status.bet = 4;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 4 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        if(maxstrength > 32 && status.bet < 3)
-        {
-            status.bet = 3;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 3 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        if(maxstrength > 22 && status.bet < 2)
-        {
-            status.bet = 2;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 2 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        cout << "Bet 0 with strength " << maxstrength << endl << endl;
-        return false;
-    }
-    void bethelper(int suit, int worth, vector<int> &suits)
-    {
-        int suitindex;
-        if(suit == 's') suitindex = 3;
-        else if(suit == 'c') suitindex = 2;
-        else suitindex = (suit == 'h');
-        if(worth == 1) suits[suitindex] += 1;
-        else
-        {
-            for(int i = 0; i < 3; ++i)
-            {
-                if(i == suitindex) suits[i] += worth;
-                else suits[i] += worth*0.5;
-            }
-        }
-    }
-    void settrumpsuit(int suit, status &status)
-    {
-        if(suit == 3) status.trumpsuit = 's';
-        if(suit == 2) status.trumpsuit = 'c';
-        if(suit == 1) status.trumpsuit = 'h';
-        if(suit == 0) status.trumpsuit = 'd';
-    }
-    void forcebet(status &status)
-    {
-        printhand();
-        cout << whichplayer << endl;
-        cout << "Forced to bet" << endl << endl;
-        status.bet = 2;
-        status.whobet = whichplayer;
-        int whichsuit[4] = {0,0,0,0};
-        for(auto card:hand)
-        {
-            if(card.getvalue() < 4) whichsuit[forcebethelper(card)] += 6;
-            else if(card.getvalue() > 13) whichsuit[forcebethelper(card)] += 12;
-            else if(card.getvalue() > 11) whichsuit[forcebethelper(card)] += 8;
-            else if(card.getvalue() == 11) whichsuit[forcebethelper(card)] += 6;
-            else if(card.getvalue() == 10) whichsuit[forcebethelper(card)] += 4;
-        }
-        int max = 0, index = 0;
-        for(int i = 0; i < 4; ++i)
-        {
-            if(whichsuit[i] > max)
-            {
-                index = i;
-                max = whichsuit[i];
-            }
-        }
-        if(index == 0) status.trumpsuit = 's';
-        if(index == 1) status.trumpsuit = 'c';
-        if(index == 2) status.trumpsuit = 'h';
-        if(index == 3) status.trumpsuit = 'd';
-    }
-    int forcebethelper(card helper)
-    {
-        if(helper.getsuit() == 's') return 0;
-        if(helper.getsuit() == 'c') return 1;
-        if(helper.getsuit() == 'h') return 2;
-        return 3;
-    }
-    void initialize()
-    {
-        double weight;
-        ifstream weightinput("weights.txt");
-        for(int i = 0; i < 80; ++i)
-        {
-            layer1weights.push_back(vector<double>(120));
-            for(int j = 0; j < 120; ++j)
-            {
-                weightinput >> weight;
-                layer1weights[i].push_back(weight);
-            }
-        }
-        for(int i = 0; i < 6; ++i)
-        {
-            layer2weights.push_back(vector<double>(120));
-            for(int j = 0; j < 80; ++j)
-            {
-                weightinput >> weight;
-                layer2weights[i].push_back(weight);
-            }
-        }
-    }
-    void playcard(status &status, bool first)
-    {
-        vector<double> output;
-        hiddenlayer.resize(80);
-        for(int i = 0; i < 80; ++i)
-        {
-            hiddenlayer[i] = 0;
-            for(int j = 0; j < 120; ++j) hiddenlayer[i] += inputneurons[j] * layer1weights[i][j];
-        }
-        //activation function for hidden layer neurons
-        for(int i = 0; i < 80; ++i) hiddenlayer[i] = 1 / (1 + pow(2.71828182846, -1 * hiddenlayer[i]));
-        for(int i = 0; i < 6; ++i)
-        {
-            outputlayer[i] = 0;
-            for(int j = 0; j < 80; ++j) outputlayer[i] += hiddenlayer[j] * layer2weights[i][j];
-        }
-        //output is weights in doubles
-        for(int i = 0; i < 6; ++i) outputlayer[i] = 1 / (1 + pow(2.71828182846, -1 * outputlayer[i]));
-        int choice = findmaxposition(outputlayer);
+        vector<int> inputneurons = status.getstatus(hand);
+        ann->setinputneurons(inputneurons);
+        vector<double> nnoutput = ann->compute();
+        int choice = findmaxposition(nnoutput);
         //housekeeping
         hand[choice].whoplayed = whichplayer;
-        if(first) status.ledsuit = hand[choice].getsuit();
+        ++status.nummovestaken;
+        cout << "Card Played: " << char(hand[choice].getsuit() - 32) << " " << hand[choice].getvalue() << endl;
         status.trick.push_back(hand[choice]);
-        if(choice != hand.size() - 1) swap(*(hand.begin() + choice),hand.back());
-        hand.pop_back();
+        hand.erase(hand.begin() + choice);
     }
     int findmaxposition(vector<double> outputlayer)
     {
         int max = 0;
         for(int i = 0; i < 6; ++i) if(outputlayer[i] >= outputlayer[max]) max = i;
         return max;
-    }
-    void backpropagate(vector<double> outputlayer)
-    {
-        vector<double> targetoutput(6);
-        for(int i = 0; i < 6; ++i) cin >> targetoutput[i];
-        //compute layer 2
-        for(int i = 0; i < 6; i++)
-        {
-            double constant = 0.05*(targetoutput[i]-outputlayer[i])*outputlayer[i]*(1-outputlayer[i]);
-            for(int j = 0; j < 80; ++j) layer2weights[i][j] = constant*hiddenlayer[j];
-        }
-        //compute layer 1
-        for(int i = 0; i < 80; ++i)
-        {
-            double constant = 0.05;
-            for(int j = 0; j < 6; ++j)
-            {
-                constant *= (targetoutput[j]-outputlayer[j])*(1-outputlayer[j])*(outputlayer[j]);
-                layer1weights[i][j] += constant;
-            }
-        }
     }
     void printhand()
     {
@@ -927,16 +971,12 @@ class learner : public player
         cout << endl;
     }
 private:
-    vector<vector<double>> layer1weights; //120 rows, 80 columns
-    vector<vector<double>> layer2weights; //80 rows, 6 columns
-    vector<int> inputneurons;//first 40 = hand, second 40 = trick, third 40 = collected;
-    vector<double> hiddenlayer;
-    vector<double> outputlayer;
+    neuralnetwork* ann;
 };
 
 class human : public player
 {
-    void playcard(status &status, bool first)
+    void playcard(status &status, bool first, const bool &forgenerating)
     {
         cout << "Player " << whichplayer << ": You" << endl;
         printhand();
@@ -981,41 +1021,109 @@ class human : public player
 void setup(vector<player*> &players, deck &carddeck, status &status);
 void dealcards(vector<player*> &players, const deck &carddeck, status &status);
 void makebets(const vector<player*> &players, status &status);
-void playtrick(const vector<player*> &players, status &status);
+void playtrick(const vector<player*> &players, status &status,const bool &forgenerating);
+
+class generatetrainingdata
+{
+public:
+    generatetrainingdata() : dataoutput("training.txt") {};
+    void startgenerating()
+    {
+        for(int i = 0; i < 500; ++i)
+        {
+            deck carddeck;
+            carddeck.makedeck();
+            status status;
+            vector<player*> players(4);
+            for(int i = 0; i < 4; ++i)
+            {
+                players.push_back(new rulesbased());
+                players[i]->whichplayer = i;
+            }
+            while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
+            {
+                carddeck.shuffle();
+                dealcards(players, carddeck, status);
+                makebets(players, status);
+                for(int round = 0; round < 6; ++round)
+                {
+                    int currplayer = status.wholeads;
+                    logbinarystatus(status.getstatus(players[currplayer]->gethand()));
+                    players[currplayer]->playcard(status,true, true);
+                    logcardchoice(players[currplayer]->getchoice());
+                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
+                    players[(currplayer+1)%4]->playcard(status,false, true);
+                    logcardchoice(players[currplayer]->getchoice());
+                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
+                    players[(currplayer+2)%4]->playcard(status,false, true);
+                    logcardchoice(players[currplayer]->getchoice());
+                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
+                    players[(currplayer+3)%4]->playcard(status,false, true);
+                    logcardchoice(players[currplayer]->getchoice());
+                    status.resettrick();
+                }
+                status.resethand();
+            }
+        }
+    }
+    void logbinarystatus(vector<int> binarystatus)
+    {
+        for(auto i: binarystatus) dataoutput << i << " ";
+    }
+    void logcardchoice(vector<int> cardchoice)
+    {
+        for(auto i: cardchoice) dataoutput << i << " ";
+    }
+private:
+    ofstream dataoutput;
+};
 
 int main(int argc, const char * argv[])
 {
-    ofstream weightoutput("output.txt");
-    for(int i = 0; i < 3; ++i)
+    cout << "Do you want to generate data(1), train the nn on data(2), or play against the neural network(3)?" << endl;
+    int answer;
+    cin >> answer;
+    if(answer == 1)
     {
-        deck carddeck;
-        vector<player*> players;
-        status status;
-        setup(players, carddeck, status);
-        while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
-        {
-            carddeck.shuffle();
-            dealcards(players, carddeck, status);
-            makebets(players, status);
-            for(int round = 0; round < 6; ++round) playtrick(players, status);
-            status.resethand();
-        }
-        if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
-        else cout << "You win!! Congrats" << endl;
+        generatetrainingdata generate;
+        generate.startgenerating();
     }
-    remove("weights.txt");
-    rename("output.txt","weights.txt");
+    else if(answer == 2)
+    {
+        neuralnetwork nn;
+        nn.learn();
+    }
+    else
+    {
+        for(int i = 0; i < 3; ++i)
+        {
+            deck carddeck;
+            vector<player*> players;
+            status status;
+            setup(players, carddeck, status);
+            while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
+            {
+                carddeck.shuffle();
+                dealcards(players, carddeck, status);
+                makebets(players, status);
+                for(int round = 0; round < 6; ++round) playtrick(players, status, false);
+                status.resethand();
+            }
+            if(status.overallscore[0] < 11) cout << "You Lose: Team 2 Wins" << endl;
+            else cout << "You win!! Congrats" << endl;
+        }
+    }
     return 0;
 }
 
 void setup(vector<player*> &players, deck &carddeck, status &status)
 {
     carddeck.makedeck();
-    players.push_back(new trainer());
+    players.push_back(new rulesbased());
     players[0]->whichplayer = 0;
     for(int i = 1; i < 4; ++i)
     {
-        players.push_back(new trainer());
+        players.push_back(new rulesbased());
         players[i]->whichplayer = i;
     }
 }
@@ -1042,16 +1150,16 @@ void makebets(const vector<player*> &players, status &status)
     cout << endl;
 }
 
-void playtrick(const vector<player*> &players, status &status)
+void playtrick(const vector<player*> &players, status &status,const bool &forgenerating)
 {
     int currplayer = status.wholeads;
-    players[currplayer]->playcard(status,true);
+    players[currplayer]->playcard(status,true, forgenerating);
     cout << endl;
-    players[(currplayer+1)%4]->playcard(status,false);
+    players[(currplayer+1)%4]->playcard(status,false, forgenerating);
     cout << endl;
-    players[(currplayer+2)%4]->playcard(status,false);
+    players[(currplayer+2)%4]->playcard(status,false, forgenerating);
     cout << endl;
-    players[(currplayer+3)%4]->playcard(status,false);
+    players[(currplayer+3)%4]->playcard(status,false, forgenerating);
     cout << endl;
     status.resettrick();
     cout << endl << endl;
