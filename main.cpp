@@ -243,17 +243,21 @@ public:
     void learn()
     {
         int trainingline = 0;
+        inputneurons.resize(120);
+        actualoutput.resize(6);
         while(trainingline < 10000)
         {
             for(int i = 0; i < 120; ++i) datainput >> inputneurons[i];
             for(int i = 0; i < 6; ++i) datainput >> actualoutput[i];
             compute();
             backpropagate();
-            if(trainingline % 100 == 0) cout << trainingline++/100 << endl;
+            if(trainingline % 100 == 0) cout << trainingline/100 << endl;
+            trainingline++;
         }
     }
     vector<double> compute()
     {
+        outputlayer.resize(6);
         hiddenlayer.resize(80);
         for(int i = 0; i < 80; ++i)
         {
@@ -273,12 +277,10 @@ public:
     }
     void backpropagate()
     {
-        vector<double> targetoutput(6);
-        for(int i = 0; i < 6; ++i) cin >> targetoutput[i];
         //compute layer 2
         for(int i = 0; i < 6; i++)
         {
-            double constant = 0.05*(targetoutput[i]-outputlayer[i])*outputlayer[i]*(1-outputlayer[i]);
+            double constant = 0.05*(actualoutput[i]-outputlayer[i])*outputlayer[i]*(1-outputlayer[i]);
             for(int j = 0; j < 80; ++j) layer2weights[i][j] = constant*hiddenlayer[j];
         }
         //compute layer 1
@@ -287,7 +289,7 @@ public:
             double constant = 0.05;
             for(int j = 0; j < 6; ++j)
             {
-                constant *= (targetoutput[j]-outputlayer[j])*(1-outputlayer[j])*(outputlayer[j]);
+                constant *= (actualoutput[j]-outputlayer[j])*(1-outputlayer[j])*(outputlayer[j]);
                 layer1weights[i][j] += constant;
             }
         }
@@ -300,18 +302,27 @@ private:
     vector<double> hiddenlayer;
     vector<double> outputlayer;
     vector<int> actualoutput;
-    ifstream weightinput;
     ifstream datainput;
+    ifstream weightinput;
     ofstream weightoutput;
+};
+
+struct cardcomparator
+{
+    bool operator()(card a, card b)
+    {
+        if(a.getsuit() != b.getsuit()) return a.getsuit() < b.getsuit();
+        return a.getvalue() < b.getvalue();
+    }
 };
 
 class player
 {
 public:
-    bool bet(status &status, const int &index)
+    virtual bool bet(status &status, const int &index)
     {
-        printhand();
-        cout << "Player " << whichplayer << ": Trainer" << endl;
+        if(!forgenerating) printhand();
+        if(!forgenerating) cout << "Player " << whichplayer << ": Trainer" << endl;
         vector<int> suits = {0,0,0,0};
         for(auto card: hand)
         {
@@ -335,7 +346,7 @@ public:
             status.bet = 4;
             status.whobet = whichplayer;
             settrumpsuit(maxindex,status);
-            cout << "Bet 4 with strength " << maxstrength << endl << endl;
+            if(!forgenerating) cout << "Bet 4 with strength " << maxstrength << endl << endl;
             return true;
         }
         if(maxstrength > 32 && status.bet < 3)
@@ -343,7 +354,7 @@ public:
             status.bet = 3;
             status.whobet = whichplayer;
             settrumpsuit(maxindex,status);
-            cout << "Bet 3 with strength " << maxstrength << endl << endl;
+            if(!forgenerating) cout << "Bet 3 with strength " << maxstrength << endl << endl;
             return true;
         }
         if(maxstrength > 22 && status.bet < 2)
@@ -351,13 +362,13 @@ public:
             status.bet = 2;
             status.whobet = whichplayer;
             settrumpsuit(maxindex,status);
-            cout << "Bet 2 with strength " << maxstrength << endl << endl;
+            if(!forgenerating) cout << "Bet 2 with strength " << maxstrength << endl << endl;
             return true;
         }
-        cout << "Bet 0 with strength " << maxstrength << endl << endl;
+        if(!forgenerating) cout << "Bet 0 with strength " << maxstrength << endl << endl;
         return false;
     }
-    void bethelper(int suit, int worth, vector<int> &suits)
+    virtual void bethelper(int suit, int worth, vector<int> &suits)
     {
         int suitindex;
         if(suit == 's') suitindex = 3;
@@ -373,18 +384,18 @@ public:
             }
         }
     }
-    void settrumpsuit(int suit, status &status)
+    virtual void settrumpsuit(int suit, status &status)
     {
         if(suit == 3) status.trumpsuit = 's';
         if(suit == 2) status.trumpsuit = 'c';
         if(suit == 1) status.trumpsuit = 'h';
         if(suit == 0) status.trumpsuit = 'd';
     }
-    void forcebet(status &status)
+    virtual void forcebet(status &status)
     {
-        printhand();
-        cout << whichplayer << endl;
-        cout << "Forced to bet" << endl << endl;
+        if(!forgenerating) printhand();
+        if(!forgenerating) cout << whichplayer << endl;
+        if(!forgenerating) cout << "Forced to bet" << endl << endl;
         status.bet = 2;
         status.whobet = whichplayer;
         int whichsuit[4] = {0,0,0,0};
@@ -410,140 +421,36 @@ public:
         if(index == 2) status.trumpsuit = 'h';
         if(index == 3) status.trumpsuit = 'd';
     }
-    int forcebethelper(card helper)
+    virtual int forcebethelper(card helper)
     {
         if(helper.getsuit() == 's') return 0;
         if(helper.getsuit() == 'c') return 1;
         if(helper.getsuit() == 'h') return 2;
         return 3;
     }
-    vector<card> gethand();
-    vector<int> getchoice();
-    virtual void playcard(status &status, bool first, const bool &forgenerating) = 0;
+    virtual void sorthand()
+    {
+        sort(hand.begin(), hand.end(), cardcomparator());
+    }
     virtual void printhand() = 0;
+    virtual void playcard(status &status, bool first) = 0;
+    vector<int> getchoice();
     vector<card> hand;
+    bool forgenerating = false;
     int whichplayer = 0;
 };
 
 class rulesbased : public player
 {
-    bool bet(status &status, const int &index)
+public:
+    void playcard(status &status, bool first)
     {
-        printhand();
-        cout << "Player " << whichplayer << ": Trainer" << endl;
-        vector<int> suits = {0,0,0,0};
-        for(auto card: hand)
-        {
-            if(card.getvalue() == 14) bethelper(card.getsuit(), 10, suits);
-            if(card.getvalue() == 13) bethelper(card.getsuit(), 9, suits);
-            if(card.getvalue() == 12) bethelper(card.getsuit(), 6, suits);
-            if(card.getvalue() == 11) bethelper(card.getsuit(), 9, suits);
-            if(card.getvalue() == 10) bethelper(card.getsuit(), 4, suits);
-            if(card.getvalue() == 3) bethelper(card.getsuit(), 4, suits);
-            if(card.getvalue() == 2) bethelper(card.getsuit(), 7, suits);
-            else bethelper(card.getsuit(), 1, suits);
-        }
-        int maxstrength = 0, maxindex = 0;
-        for(int i = 0; i < 3; ++i) if(suits[i] > maxstrength)
-        {
-            maxstrength = suits[i];
-            maxindex = i;
-        }
-        if(maxstrength > 42 && status.bet < 4)
-        {
-            status.bet = 4;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 4 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        if(maxstrength > 32 && status.bet < 3)
-        {
-            status.bet = 3;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 3 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        if(maxstrength > 22 && status.bet < 2)
-        {
-            status.bet = 2;
-            status.whobet = whichplayer;
-            settrumpsuit(maxindex,status);
-            cout << "Bet 2 with strength " << maxstrength << endl << endl;
-            return true;
-        }
-        cout << "Bet 0 with strength " << maxstrength << endl << endl;
-        return false;
-    }
-    void bethelper(int suit, int worth, vector<int> &suits)
-    {
-        int suitindex;
-        if(suit == 's') suitindex = 3;
-        else if(suit == 'c') suitindex = 2;
-        else suitindex = (suit == 'h');
-        if(worth == 1) suits[suitindex] += 1;
-        else
-        {
-            for(int i = 0; i < 3; ++i)
-            {
-                if(i == suitindex) suits[i] += worth;
-                else suits[i] += worth*0.5;
-            }
-        }
-    }
-    void settrumpsuit(int suit, status &status)
-    {
-        if(suit == 3) status.trumpsuit = 's';
-        if(suit == 2) status.trumpsuit = 'c';
-        if(suit == 1) status.trumpsuit = 'h';
-        if(suit == 0) status.trumpsuit = 'd';
-    }
-    void forcebet(status &status)
-    {
-        printhand();
-        cout << whichplayer << endl;
-        cout << "Forced to bet" << endl << endl;
-        status.bet = 2;
-        status.whobet = whichplayer;
-        int whichsuit[4] = {0,0,0,0};
-        for(auto card:hand)
-        {
-            if(card.getvalue() < 4) whichsuit[forcebethelper(card)] += 6;
-            else if(card.getvalue() > 13) whichsuit[forcebethelper(card)] += 12;
-            else if(card.getvalue() > 11) whichsuit[forcebethelper(card)] += 8;
-            else if(card.getvalue() == 11) whichsuit[forcebethelper(card)] += 6;
-            else if(card.getvalue() == 10) whichsuit[forcebethelper(card)] += 4;
-        }
-        int max = 0, index = 0;
-        for(int i = 0; i < 4; ++i)
-        {
-            if(whichsuit[i] > max)
-            {
-                index = i;
-                max = whichsuit[i];
-            }
-        }
-        if(index == 0) status.trumpsuit = 's';
-        if(index == 1) status.trumpsuit = 'c';
-        if(index == 2) status.trumpsuit = 'h';
-        if(index == 3) status.trumpsuit = 'd';
-    }
-    int forcebethelper(card helper)
-    {
-        if(helper.getsuit() == 's') return 0;
-        if(helper.getsuit() == 'c') return 1;
-        if(helper.getsuit() == 'h') return 2;
-        return 3;
-    }
-    void playcard(status &status, bool first, const bool &forgenerating)
-    {
-        cout << "Player " << whichplayer << ": Trainer" << endl;
-        printhand();
+        if(!forgenerating) cout << "Player " << whichplayer << ": Trainer" << endl;
+        if(!forgenerating) printhand();
         //if first player lead out (different logic)
         if(first)
         {
-            leadout(status, forgenerating);
+            leadout(status);
             return;
         }
         playablecards.clear();
@@ -559,7 +466,7 @@ class rulesbased : public player
         }
         if(playablecards.size() == 1)
         {
-            playcardhelper(pair<bool,card>(true,playablecards[0]), status, forgenerating);
+            playcardhelper(pair<bool,card>(true,playablecards[0]), status);
             return;
         }
         if(!ledsuitseen) playablecards = hand;
@@ -568,28 +475,28 @@ class rulesbased : public player
         if(!status.jackcollected) result = proirity1(status);
         if(result.first == true)
         {
-            playcardhelper(result, status, forgenerating);
+            playcardhelper(result, status);
             return;
         }
         //check to see whether a significant amount of game can be taken in/contributed
         result = proirity2(status);
         if(result.first == true)
         {
-            playcardhelper(result, status, forgenerating);
+            playcardhelper(result, status);
             return;
         }
         // attempt to take in the trick, if not possible return worst card
         result = proirity3(status);
-        playcardhelper(result, status, forgenerating);
+        playcardhelper(result, status);
         return;
     }
-    void playcardhelper(pair<bool,card> result, status &status, const bool &forgenerating)
+    void playcardhelper(pair<bool,card> result, status &status)
     {
         lastchoice.clear();
         assert(result.second.getsuit() != 0);
         result.second.whoplayed = whichplayer;
         ++status.nummovestaken;
-        cout <<"Card Played: "<<char(result.second.getsuit() - 32)<< " " << result.second.getvalue() << endl;
+        if(!forgenerating) cout <<"Card Played: "<<char(result.second.getsuit() - 32)<< " " << result.second.getvalue() << endl;
         status.trick.push_back(result.second);
         int handsize = (int)hand.size();
         for(int i = 0; i < handsize; ++i)
@@ -603,7 +510,7 @@ class rulesbased : public player
         }
         for(int i = 0; i < 6 - handsize; ++i) lastchoice.push_back(0);
     }
-    void leadout(status &status, const bool &forgenerating)
+    void leadout(status &status)
     {
         pair<bool,card> choice(true,card(0,0));
         choice.first = true;
@@ -620,14 +527,14 @@ class rulesbased : public player
             {
                 choice.second = greaterthanjack;
                 status.ledsuit = status.trumpsuit;
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             if(lessthanten.getvalue() != 11)
             {
                 choice.second = lessthanten;
                 status.ledsuit = status.trumpsuit;
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             else
@@ -638,7 +545,7 @@ class rulesbased : public player
                     {
                         choice.second = card;
                         status.ledsuit = status.trumpsuit;
-                        playcardhelper(choice, status, forgenerating);
+                        playcardhelper(choice, status);
                     }
                 }
             }
@@ -682,34 +589,34 @@ class rulesbased : public player
             {
                 choice.second = hightrumpsuit;
                 status.ledsuit = hightrumpsuit.getsuit();
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             if(highothersuit.getvalue() != 0)
             {
                 choice.second = highothersuit;
                 status.ledsuit = highothersuit.getsuit();
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             if(lowtrumpsuit.getvalue() != 0)
             {
                 choice.second = lowtrumpsuit;
                 status.ledsuit = lowtrumpsuit.getsuit();
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             if(anyothersuit.getvalue() != 0)
             {
                 choice.second = anyothersuit;
                 status.ledsuit = anyothersuit.getsuit();
-                playcardhelper(choice, status, forgenerating);
+                playcardhelper(choice, status);
                 return;
             }
             //should never get here but for compile reasons
             choice.second = hand[0];
             status.ledsuit = hand[0].getsuit();
-            playcardhelper(choice, status, forgenerating);
+            playcardhelper(choice, status);
             return;
         }
     }
@@ -935,7 +842,6 @@ class rulesbased : public player
         for(auto card:hand) cout << char(card.getsuit() - 32) << " " << card.getvalue() << "   ";
         cout << endl;
     }
-    vector<card> gethand() { return hand; }
     vector<int> getchoice() { return lastchoice; }
 private:
     vector<card> playablecards;
@@ -954,7 +860,7 @@ class nnplayer : public player
         //housekeeping
         hand[choice].whoplayed = whichplayer;
         ++status.nummovestaken;
-        cout << "Card Played: " << char(hand[choice].getsuit() - 32) << " " << hand[choice].getvalue() << endl;
+        if(!forgenerating) cout << "Card Played: " << char(hand[choice].getsuit() - 32) << " " << hand[choice].getvalue() << endl;
         status.trick.push_back(hand[choice]);
         hand.erase(hand.begin() + choice);
     }
@@ -989,7 +895,7 @@ class human : public player
         if(index!=hand.size() - 1) swap(*(hand.begin() + index),hand.back());
         hand.pop_back();
     }
-    bool bet(status &status, const int &index)
+    bool bet(status &status, const int &index, const bool &forgenerating)
     {
         printhand();
         cout << "Player " << whichplayer << ": Human" << endl;
@@ -1034,32 +940,53 @@ public:
             deck carddeck;
             carddeck.makedeck();
             status status;
-            vector<player*> players(4);
+            vector<rulesbased*> players;
             for(int i = 0; i < 4; ++i)
             {
                 players.push_back(new rulesbased());
+                players[i]->forgenerating = true;
                 players[i]->whichplayer = i;
             }
             while(status.overallscore[0] < 11 && status.overallscore[1] < 11)
             {
+                //DEAL THE CARDS
                 carddeck.shuffle();
-                dealcards(players, carddeck, status);
-                makebets(players, status);
+                int index = 0, i = 0;
+                while(index != 4*6) players[(i++)%4]->hand.push_back(carddeck.carddeck[index++]);
+                status.whodealt = (status.whodealt+1) % 4;
+                //MAKE THE BETS
+                int currentbetter = status.whodealt;
+                for(int i = 0; i < 3; ++i)
+                {
+                    players[currentbetter]->bet(status, currentbetter%2);
+                    currentbetter = (currentbetter + 1) % 4;
+                }
+                //if nobody has bet yet, the dealer is screwed
+                if(status.bet == 0) players[currentbetter]->forcebet(status);
+                else players[currentbetter]->bet(status,currentbetter);
+                for(int i = 0; i < 4; ++i) players[i]->sorthand();
+                status.wholeads = status.whobet;
+                cout << endl;
+                //PLAY THE TRICKS
                 for(int round = 0; round < 6; ++round)
                 {
                     int currplayer = status.wholeads;
-                    logbinarystatus(status.getstatus(players[currplayer]->gethand()));
-                    players[currplayer]->playcard(status,true, true);
+                    logbinarystatus(status.getstatus(players[currplayer]->hand));
+                    players[currplayer]->playcard(status,true);
                     logcardchoice(players[currplayer]->getchoice());
-                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
-                    players[(currplayer+1)%4]->playcard(status,false, true);
+                    currplayer = (currplayer + 1) % 4;
+                    logbinarystatus(status.getstatus(players[currplayer]->hand));
+                    players[(currplayer)%4]->playcard(status,false);
                     logcardchoice(players[currplayer]->getchoice());
-                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
-                    players[(currplayer+2)%4]->playcard(status,false, true);
+                    currplayer = (currplayer + 1) % 4;
+                    logbinarystatus(status.getstatus(players[currplayer]->hand));
+                    players[(currplayer)%4]->playcard(status,false);
                     logcardchoice(players[currplayer]->getchoice());
-                    logbinarystatus(status.getstatus(players[++currplayer]->gethand()));
-                    players[(currplayer+3)%4]->playcard(status,false, true);
+                    currplayer = (currplayer + 1) % 4;
+                    logbinarystatus(status.getstatus(players[currplayer]->hand));
+                    players[(currplayer)%4]->playcard(status,false);
                     logcardchoice(players[currplayer]->getchoice());
+                    currplayer = (currplayer + 1) % 4;
                     status.resettrick();
                 }
                 status.resethand();
@@ -1153,13 +1080,13 @@ void makebets(const vector<player*> &players, status &status)
 void playtrick(const vector<player*> &players, status &status,const bool &forgenerating)
 {
     int currplayer = status.wholeads;
-    players[currplayer]->playcard(status,true, forgenerating);
+    players[currplayer]->playcard(status,true);
     cout << endl;
-    players[(currplayer+1)%4]->playcard(status,false, forgenerating);
+    players[(currplayer+1)%4]->playcard(status,false);
     cout << endl;
-    players[(currplayer+2)%4]->playcard(status,false, forgenerating);
+    players[(currplayer+2)%4]->playcard(status,false);
     cout << endl;
-    players[(currplayer+3)%4]->playcard(status,false, forgenerating);
+    players[(currplayer+3)%4]->playcard(status,false);
     cout << endl;
     status.resettrick();
     cout << endl << endl;
