@@ -15,7 +15,7 @@ Hidden Layer
 Output Layer
  - 6 Neurons: for each card in the players hand (with weights based on which card is ideal to play)
 
-
+------------------------------------------
 
 Description of the Card Game: Smear
 
