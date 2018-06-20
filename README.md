@@ -2,7 +2,7 @@
 
 The objective of this project is to create a reinforcement learning based AI that will learn from the AI who's logic I've hard coded and eventually overtake it in terms of game skill.
 
-The structure of the neural net is as follows:
+The structure of the neural network is as follows:
 Input Neurons
 - 40 Neurons: cards in the players hand (0 = card is not present in hand, 1 = card is present in hand)
 - 40 Neurons: cards in the trick (0 = card is not present in the trick, 1 = card is present in the trick)
