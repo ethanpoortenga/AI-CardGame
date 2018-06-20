@@ -3,16 +3,17 @@
 The objective of this project is to create a reinforcement learning based AI that will learn from the AI who's logic I've hard coded and eventually overtake it in terms of game skill.
 
 The structure of the neural network is as follows:
-- Input Neurons
+
+Input Neurons
  - 40 Neurons: cards in the players hand (0 = card is not present in hand, 1 = card is present in hand)
  - 40 Neurons: cards in the trick (0 = card is not present in the trick, 1 = card is present in the trick)
  - 40 Neurons: cards already played (0 = card has not been played, 1 = card has been played)
-- Hidden Layer
+ 
+Hidden Layer
  - 120(Total Input Neurons) * (2/3) = 80 Hidden Neurons (as a starting point)
-- Output Layer
+ 
+Output Layer
  - 6 Neurons: for each card in the players hand (with weights based on which card is ideal to play)
-
-After I get both of them working I'll post some stastics about the outcomes
 
 
 
