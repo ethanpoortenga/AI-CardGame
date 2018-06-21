@@ -8,7 +8,7 @@
 
 #include "neuralnetwork.h"
 
-neuralnetwork::neuralnetwork() : weightinput("weights.txt"), weightoutput("output.txt"), datainput("training.txt")
+neuralnetwork::neuralnetwork() : weightinput("random_weights.txt"), weightoutput("output.txt"), datainput("training.txt")
 {
     double weight;
     for(int i = 0; i < 80; ++i)
